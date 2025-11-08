@@ -19,6 +19,7 @@ import { Button } from "@/components/button";
 import { WidgetProvider } from "@/contexts/WidgetContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { MiningConfigProvider } from "@/contexts/MiningConfigContext";
+import { LocalizationProvider } from "@/contexts/LocalizationContext";
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -86,10 +87,11 @@ export default function RootLayout() {
         <ThemeProvider
           value={colorScheme === "dark" ? CustomDarkTheme : CustomDefaultTheme}
         >
-          <MiningConfigProvider>
-            <AuthProvider>
-              <WidgetProvider>
-                <GestureHandlerRootView>
+          <LocalizationProvider>
+            <MiningConfigProvider>
+              <AuthProvider>
+                <WidgetProvider>
+                  <GestureHandlerRootView>
                 <Stack>
                 {/* Auth screens */}
                 <Stack.Screen name="(auth)" options={{ headerShown: false }} />
@@ -142,6 +144,7 @@ export default function RootLayout() {
               </WidgetProvider>
             </AuthProvider>
           </MiningConfigProvider>
+          </LocalizationProvider>
         </ThemeProvider>
     </>
   );

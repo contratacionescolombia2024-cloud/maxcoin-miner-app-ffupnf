@@ -16,6 +16,7 @@ import { colors } from "@/styles/commonStyles";
 import { router } from "expo-router";
 import { useAuth } from "@/contexts/AuthContext";
 import { useMiningConfig } from "@/contexts/MiningConfigContext";
+import { useLocalization } from "@/contexts/LocalizationContext";
 import PriceChart from "@/components/PriceChart";
 import Animated, {
   useSharedValue,
@@ -29,6 +30,7 @@ export default function HomeScreen() {
   const theme = useTheme();
   const { user, updateBalance, refreshUser } = useAuth();
   const { config } = useMiningConfig();
+  const { t } = useLocalization();
   const [isMining, setIsMining] = useState(false);
   const [miningProgress, setMiningProgress] = useState(0);
   const [minedAmount, setMinedAmount] = useState(0);
@@ -120,9 +122,9 @@ export default function HomeScreen() {
     if (isMining && minedAmount > 0) {
       updateBalance(minedAmount);
       Alert.alert(
-        "Mining Stopped",
-        `You have mined ${minedAmount.toFixed(6)} MXI!\n\nYour balance has been updated.`,
-        [{ text: "OK" }]
+        t('home.miningStopped'),
+        t('home.miningStoppedMessage', { amount: minedAmount.toFixed(6) }),
+        [{ text: t('common.ok') }]
       );
     }
     setIsMining(false);
@@ -134,9 +136,9 @@ export default function HomeScreen() {
   const connectBinance = () => {
     setBinanceConnected(true);
     Alert.alert(
-      "Binance Connected",
-      "Your Binance account has been connected successfully! (Simulated)",
-      [{ text: "OK" }]
+      t('home.binanceConnected'),
+      t('home.binanceConnectedMessage'),
+      [{ text: t('common.ok') }]
     );
   };
 
@@ -164,7 +166,7 @@ export default function HomeScreen() {
       {Platform.OS === 'ios' && (
         <Stack.Screen
           options={{
-            title: "Maxcoin MXI Mining",
+            title: t('home.title'),
             headerRight: renderHeaderRight,
           }}
         />
@@ -188,27 +190,27 @@ export default function HomeScreen() {
             </Animated.View>
           </View>
           
-          <Text style={styles.balanceLabel}>Your Balance</Text>
+          <Text style={styles.balanceLabel}>{t('home.yourBalance')}</Text>
           <Text style={styles.balanceAmount}>{user.balance.toFixed(6)} MXI</Text>
           
           <View style={styles.levelBadge}>
             <IconSymbol name="star.fill" size={16} color={colors.accent} />
-            <Text style={styles.levelText}>Mining Power: {user.miningPower.toFixed(2)}x</Text>
+            <Text style={styles.levelText}>{t('home.miningPower')}: {user.miningPower.toFixed(2)}x</Text>
           </View>
         </View>
 
         {/* Real-Time Price Chart */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Market Price (Reference)</Text>
+          <Text style={styles.cardTitle}>{t('home.marketPrice')}</Text>
           <Text style={styles.cardSubtitle}>
-            Live cryptocurrency price from Binance
+            {t('home.livePriceSubtitle')}
           </Text>
           <PriceChart />
         </View>
 
         {/* Mining Progress Card */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Mining Progress</Text>
+          <Text style={styles.cardTitle}>{t('home.miningProgress')}</Text>
           
           <View style={styles.miningStatsContainer}>
             <View style={styles.miningStatBox}>
@@ -216,7 +218,7 @@ export default function HomeScreen() {
               <Text style={styles.miningStatValue}>
                 {isMining ? minedAmount.toFixed(6) : '0.000000'}
               </Text>
-              <Text style={styles.miningStatLabel}>Mined This Session</Text>
+              <Text style={styles.miningStatLabel}>{t('home.minedThisSession')}</Text>
             </View>
           </View>
 
@@ -233,14 +235,14 @@ export default function HomeScreen() {
             <View style={styles.infoRow}>
               <IconSymbol name="gauge" size={20} color={colors.textSecondary} />
               <Text style={styles.infoText}>
-                Status: {isMining ? 'Mining Active' : 'Idle'}
+                {t('home.status')}: {isMining ? t('home.miningActive') : t('home.idle')}
               </Text>
             </View>
             
             <View style={styles.infoRow}>
               <IconSymbol name="chart.bar.fill" size={20} color={colors.textSecondary} />
               <Text style={styles.infoText}>
-                Rate: {formatMiningRate()} MXI / minute
+                {t('home.rate')}: {formatMiningRate()} MXI {t('home.perMinute')}
               </Text>
             </View>
           </View>
@@ -253,7 +255,7 @@ export default function HomeScreen() {
                 onPress={startMining}
               >
                 <IconSymbol name="play.fill" size={20} color="#ffffff" />
-                <Text style={styles.buttonText}>Start Mining</Text>
+                <Text style={styles.buttonText}>{t('home.startMining')}</Text>
               </Pressable>
             ) : (
               <Pressable 
@@ -261,7 +263,7 @@ export default function HomeScreen() {
                 onPress={stopMining}
               >
                 <IconSymbol name="stop.fill" size={20} color="#ffffff" />
-                <Text style={styles.buttonText}>Stop Mining & Collect</Text>
+                <Text style={styles.buttonText}>{t('home.stopMining')}</Text>
               </Pressable>
             )}
           </View>
@@ -269,9 +271,9 @@ export default function HomeScreen() {
 
         {/* Purchase Card */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Purchase Maxcoin</Text>
+          <Text style={styles.cardTitle}>{t('home.purchaseMaxcoin')}</Text>
           <Text style={styles.cardSubtitle}>
-            Increase your mining power by purchasing MXI
+            {t('home.increaseMiningPower')}
           </Text>
           
           <View style={styles.purchaseGrid}>
@@ -282,7 +284,7 @@ export default function HomeScreen() {
               <IconSymbol name="plus.circle.fill" size={32} color={colors.primary} />
               <Text style={styles.purchaseAmount}>10 MXI</Text>
               <Text style={styles.purchaseBonus}>
-                +{((10 / config.powerIncreaseThreshold) * config.powerIncreasePercent).toFixed(1)}% Power
+                +{((10 / config.powerIncreaseThreshold) * config.powerIncreasePercent).toFixed(1)}% {t('home.power')}
               </Text>
             </Pressable>
 
@@ -293,7 +295,7 @@ export default function HomeScreen() {
               <IconSymbol name="plus.circle.fill" size={32} color={colors.primary} />
               <Text style={styles.purchaseAmount}>50 MXI</Text>
               <Text style={styles.purchaseBonus}>
-                +{((50 / config.powerIncreaseThreshold) * config.powerIncreasePercent).toFixed(1)}% Power
+                +{((50 / config.powerIncreaseThreshold) * config.powerIncreasePercent).toFixed(1)}% {t('home.power')}
               </Text>
             </Pressable>
 
@@ -304,7 +306,7 @@ export default function HomeScreen() {
               <IconSymbol name="plus.circle.fill" size={32} color={colors.accent} />
               <Text style={styles.purchaseAmount}>100 MXI</Text>
               <Text style={styles.purchaseBonus}>
-                +{((100 / config.powerIncreaseThreshold) * config.powerIncreasePercent).toFixed(1)}% Power
+                +{((100 / config.powerIncreaseThreshold) * config.powerIncreasePercent).toFixed(1)}% {t('home.power')}
               </Text>
             </Pressable>
           </View>
@@ -315,46 +317,50 @@ export default function HomeScreen() {
           >
             <IconSymbol name="pencil.circle.fill" size={20} color={colors.text} />
             <Text style={[styles.buttonText, { color: colors.text }]}>
-              Custom Amount ({config.minPurchase}-{config.maxPurchase} MXI)
+              {t('home.customAmount')} ({config.minPurchase}-{config.maxPurchase} MXI)
             </Text>
           </Pressable>
         </View>
 
         {/* Referral Card */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Referral Program</Text>
+          <Text style={styles.cardTitle}>{t('home.referralProgram')}</Text>
           
           <View style={styles.referralCodeBox}>
-            <Text style={styles.referralLabel}>Your Referral Code</Text>
+            <Text style={styles.referralLabel}>{t('home.yourReferralCode')}</Text>
             <Text style={styles.referralCode}>{user.referralCode}</Text>
-            <Text style={styles.referralHint}>Share this code to earn rewards!</Text>
+            <Text style={styles.referralHint}>{t('home.shareCode')}</Text>
           </View>
 
           <View style={styles.referralStats}>
             <View style={styles.referralStatItem}>
               <IconSymbol name="person.2.fill" size={24} color={colors.primary} />
               <Text style={styles.referralStatValue}>{user.referrals.length}</Text>
-              <Text style={styles.referralStatLabel}>Referrals</Text>
+              <Text style={styles.referralStatLabel}>{t('home.referrals')}</Text>
             </View>
 
             <View style={styles.referralStatItem}>
               <IconSymbol name="dollarsign.circle.fill" size={24} color={colors.success} />
               <Text style={styles.referralStatValue}>{user.referralEarnings.toFixed(6)}</Text>
-              <Text style={styles.referralStatLabel}>Earned (MXI)</Text>
+              <Text style={styles.referralStatLabel}>{t('home.earned')} (MXI)</Text>
             </View>
           </View>
 
           <View style={styles.infoBox}>
             <IconSymbol name="info.circle.fill" size={20} color={colors.primary} />
             <Text style={styles.infoBoxText}>
-              Earn {config.level1Commission}% from Level 1, {config.level2Commission}% from Level 2, and {config.level3Commission}% from Level 3 referrals!
+              {t('home.referralInfo', { 
+                level1: config.level1Commission, 
+                level2: config.level2Commission, 
+                level3: config.level3Commission 
+              })}
             </Text>
           </View>
         </View>
 
         {/* Binance Integration Card */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Binance Integration</Text>
+          <Text style={styles.cardTitle}>{t('home.binanceIntegration')}</Text>
           
           <View style={styles.binanceStatus}>
             <IconSymbol 
@@ -363,7 +369,7 @@ export default function HomeScreen() {
               color={binanceConnected ? colors.success : colors.textSecondary} 
             />
             <Text style={styles.statusText}>
-              {binanceConnected ? "Connected to Binance" : "Not Connected"}
+              {binanceConnected ? t('home.connected') : t('home.notConnected')}
             </Text>
           </View>
 
@@ -374,7 +380,7 @@ export default function HomeScreen() {
             >
               <IconSymbol name="link" size={20} color={colors.text} />
               <Text style={[styles.buttonText, { color: colors.text }]}>
-                Connect to Binance
+                {t('home.connectToBinance')}
               </Text>
             </Pressable>
           )}
@@ -385,7 +391,7 @@ export default function HomeScreen() {
               onPress={() => router.push("/formsheet")}
             >
               <IconSymbol name="arrow.up.circle.fill" size={20} color="#ffffff" />
-              <Text style={styles.buttonText}>Withdraw MXI</Text>
+              <Text style={styles.buttonText}>{t('home.withdrawMXI')}</Text>
             </Pressable>
           )}
         </View>
@@ -394,7 +400,7 @@ export default function HomeScreen() {
         <View style={[styles.card, styles.infoCard]}>
           <IconSymbol name="info.circle.fill" size={24} color={colors.primary} />
           <Text style={styles.infoCardText}>
-            Keep the app open to mine Maxcoin MXI at {config.miningRatePerMinute} MXI per minute. Your mining power increases with purchases!
+            {t('home.infoMessage', { rate: config.miningRatePerMinute })}
           </Text>
         </View>
       </ScrollView>

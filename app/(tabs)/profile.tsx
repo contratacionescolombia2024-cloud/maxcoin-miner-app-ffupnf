@@ -15,31 +15,33 @@ import React, { useState } from "react";
 import { IconSymbol } from "@/components/IconSymbol";
 import { useAuth } from "@/contexts/AuthContext";
 import { useMiningConfig } from "@/contexts/MiningConfigContext";
+import { useLocalization } from "@/contexts/LocalizationContext";
 import { router } from "expo-router";
 
 export default function ProfileScreen() {
   const { user, logout } = useAuth();
   const { config } = useMiningConfig();
+  const { t, locale, setLocale, availableLocales } = useLocalization();
   const [name, setName] = useState(user?.username || '');
   const [email, setEmail] = useState('');
   const [binanceAddress, setBinanceAddress] = useState('');
 
   const handleSaveProfile = () => {
     Alert.alert(
-      "Profile Updated",
-      "Your profile information has been saved successfully!",
-      [{ text: "OK" }]
+      t('profile.profileUpdated'),
+      t('profile.profileUpdatedMessage'),
+      [{ text: t('common.ok') }]
     );
   };
 
   const handleLogout = () => {
     Alert.alert(
-      "Logout",
-      "Are you sure you want to logout?",
+      t('common.logout'),
+      t('profile.logoutConfirm'),
       [
-        { text: "Cancel", style: "cancel" },
+        { text: t('common.cancel'), style: "cancel" },
         {
-          text: "Logout",
+          text: t('common.logout'),
           style: "destructive",
           onPress: async () => {
             await logout();
@@ -52,9 +54,9 @@ export default function ProfileScreen() {
 
   const handleShareReferralCode = () => {
     Alert.alert(
-      "Share Referral Code",
-      `Your referral code: ${user?.referralCode}\n\nShare this code with friends to earn rewards!`,
-      [{ text: "OK" }]
+      t('profile.shareReferralCode'),
+      t('profile.shareReferralMessage', { code: user?.referralCode }),
+      [{ text: t('common.ok') }]
     );
   };
 
@@ -80,44 +82,74 @@ export default function ProfileScreen() {
           <Text style={styles.userId}>User ID: {user.id}</Text>
         </View>
 
+        {/* Language Selector Card */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>🌐 Language / Idioma / Língua</Text>
+          <View style={styles.languageContainer}>
+            {availableLocales.map((lang) => (
+              <Pressable
+                key={lang.code}
+                style={[
+                  styles.languageButton,
+                  locale === lang.code && styles.languageButtonActive,
+                ]}
+                onPress={() => setLocale(lang.code)}
+              >
+                <Text style={styles.languageFlag}>{lang.flag}</Text>
+                <Text
+                  style={[
+                    styles.languageText,
+                    locale === lang.code && styles.languageTextActive,
+                  ]}
+                >
+                  {lang.name}
+                </Text>
+                {locale === lang.code && (
+                  <IconSymbol name="checkmark.circle.fill" size={20} color={colors.primary} />
+                )}
+              </Pressable>
+            ))}
+          </View>
+        </View>
+
         {/* Balance Card */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Account Balance</Text>
+          <Text style={styles.cardTitle}>{t('profile.accountBalance')}</Text>
           <View style={styles.balanceContainer}>
             <IconSymbol name="bitcoinsign.circle.fill" size={40} color={colors.primary} />
             <View style={styles.balanceInfo}>
               <Text style={styles.balanceAmount}>{user.balance.toFixed(4)} MXI</Text>
-              <Text style={styles.balanceLabel}>Total Balance</Text>
+              <Text style={styles.balanceLabel}>{t('profile.totalBalance')}</Text>
             </View>
           </View>
         </View>
 
         {/* Mining Stats Card */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Mining Statistics</Text>
+          <Text style={styles.cardTitle}>{t('profile.miningStatistics')}</Text>
           
           <View style={styles.statRow}>
             <View style={styles.statItem}>
               <IconSymbol name="flame.fill" size={24} color={colors.accent} />
               <Text style={styles.statValue}>{user.miningPower.toFixed(2)}x</Text>
-              <Text style={styles.statLabel}>Mining Power</Text>
+              <Text style={styles.statLabel}>{t('profile.miningPower')}</Text>
             </View>
 
             <View style={styles.statItem}>
               <IconSymbol name="cart.fill" size={24} color={colors.primary} />
               <Text style={styles.statValue}>{user.totalPurchases.toFixed(2)}</Text>
-              <Text style={styles.statLabel}>Total Purchases</Text>
+              <Text style={styles.statLabel}>{t('profile.totalPurchases')}</Text>
             </View>
           </View>
         </View>
 
         {/* Referral Card */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Referral Program</Text>
+          <Text style={styles.cardTitle}>{t('profile.referralProgram')}</Text>
           
           <View style={styles.referralCodeContainer}>
             <View style={styles.referralCodeBox}>
-              <Text style={styles.referralCodeLabel}>Your Referral Code</Text>
+              <Text style={styles.referralCodeLabel}>{t('profile.yourReferralCode')}</Text>
               <Text style={styles.referralCode}>{user.referralCode}</Text>
             </View>
             <Pressable style={styles.shareButton} onPress={handleShareReferralCode}>
@@ -129,51 +161,55 @@ export default function ProfileScreen() {
             <View style={styles.statItem}>
               <IconSymbol name="person.2.fill" size={24} color={colors.primary} />
               <Text style={styles.statValue}>{user.referrals.length}</Text>
-              <Text style={styles.statLabel}>Total Referrals</Text>
+              <Text style={styles.statLabel}>{t('profile.totalReferrals')}</Text>
             </View>
 
             <View style={styles.statItem}>
               <IconSymbol name="dollarsign.circle.fill" size={24} color={colors.success} />
               <Text style={styles.statValue}>{user.referralEarnings.toFixed(4)}</Text>
-              <Text style={styles.statLabel}>Referral Earnings</Text>
+              <Text style={styles.statLabel}>{t('profile.referralEarnings')}</Text>
             </View>
           </View>
 
           <View style={styles.infoBox}>
             <IconSymbol name="info.circle.fill" size={20} color={colors.primary} />
             <Text style={styles.infoText}>
-              Earn {config.level1Commission}% from Level 1, {config.level2Commission}% from Level 2, and {config.level3Commission}% from Level 3!
+              {t('profile.referralInfo', {
+                level1: config.level1Commission,
+                level2: config.level2Commission,
+                level3: config.level3Commission,
+              })}
             </Text>
           </View>
         </View>
 
         {/* Profile Information Card */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Profile Information</Text>
+          <Text style={styles.cardTitle}>{t('profile.profileInformation')}</Text>
           
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Username</Text>
+            <Text style={styles.inputLabel}>{t('profile.username')}</Text>
             <View style={styles.inputContainer}>
               <IconSymbol name="person.fill" size={20} color={colors.textSecondary} />
               <TextInput
                 style={styles.input}
                 value={name}
                 onChangeText={setName}
-                placeholder="Enter your name"
+                placeholder={t('profile.enterName')}
                 placeholderTextColor={colors.textSecondary}
               />
             </View>
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Email</Text>
+            <Text style={styles.inputLabel}>{t('profile.email')}</Text>
             <View style={styles.inputContainer}>
               <IconSymbol name="envelope.fill" size={20} color={colors.textSecondary} />
               <TextInput
                 style={styles.input}
                 value={email}
                 onChangeText={setEmail}
-                placeholder="Enter your email"
+                placeholder={t('profile.enterEmail')}
                 placeholderTextColor={colors.textSecondary}
                 keyboardType="email-address"
                 autoCapitalize="none"
@@ -182,14 +218,14 @@ export default function ProfileScreen() {
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Binance Wallet Address</Text>
+            <Text style={styles.inputLabel}>{t('profile.binanceWallet')}</Text>
             <View style={styles.inputContainer}>
               <IconSymbol name="wallet.pass.fill" size={20} color={colors.textSecondary} />
               <TextInput
                 style={styles.input}
                 value={binanceAddress}
                 onChangeText={setBinanceAddress}
-                placeholder="Enter Binance address"
+                placeholder={t('profile.enterBinanceAddress')}
                 placeholderTextColor={colors.textSecondary}
                 autoCapitalize="none"
               />
@@ -198,13 +234,13 @@ export default function ProfileScreen() {
 
           <Pressable style={styles.saveButton} onPress={handleSaveProfile}>
             <IconSymbol name="checkmark.circle.fill" size={20} color="#ffffff" />
-            <Text style={styles.saveButtonText}>Save Changes</Text>
+            <Text style={styles.saveButtonText}>{t('profile.saveChanges')}</Text>
           </Pressable>
         </View>
 
         {/* Account Actions */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Account Actions</Text>
+          <Text style={styles.cardTitle}>{t('profile.accountActions')}</Text>
           
           <Pressable 
             style={styles.actionButton} 
@@ -212,7 +248,7 @@ export default function ProfileScreen() {
           >
             <IconSymbol name="gearshape.fill" size={24} color={colors.primary} />
             <Text style={[styles.actionButtonText, { color: colors.primary }]}>
-              Admin Panel
+              {t('profile.adminPanel')}
             </Text>
             <IconSymbol name="chevron.right" size={20} color={colors.textSecondary} />
           </Pressable>
@@ -220,7 +256,7 @@ export default function ProfileScreen() {
           <Pressable style={styles.actionButton} onPress={handleLogout}>
             <IconSymbol name="arrow.right.square.fill" size={24} color={colors.danger} />
             <Text style={[styles.actionButtonText, { color: colors.danger }]}>
-              Logout
+              {t('common.logout')}
             </Text>
             <IconSymbol name="chevron.right" size={20} color={colors.textSecondary} />
           </Pressable>
@@ -229,7 +265,7 @@ export default function ProfileScreen() {
         {/* Account Info */}
         <View style={styles.accountInfo}>
           <Text style={styles.accountInfoText}>
-            Member since: {new Date(user.createdAt).toLocaleDateString()}
+            {t('profile.memberSince')}: {new Date(user.createdAt).toLocaleDateString()}
           </Text>
         </View>
       </ScrollView>
@@ -429,5 +465,34 @@ const styles = StyleSheet.create({
   accountInfoText: {
     fontSize: 13,
     color: colors.textSecondary,
+  },
+  languageContainer: {
+    gap: 12,
+  },
+  languageButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.background,
+    borderRadius: 12,
+    padding: 16,
+    gap: 12,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  languageButtonActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.highlight,
+  },
+  languageFlag: {
+    fontSize: 24,
+  },
+  languageText: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  languageTextActive: {
+    color: colors.primary,
   },
 });
