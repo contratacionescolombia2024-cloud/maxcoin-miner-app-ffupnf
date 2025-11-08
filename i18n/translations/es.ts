@@ -128,7 +128,7 @@ export default {
     level3Referrer: 'Referidor Nivel 3',
     powerIncreaseInfo: 'Ganas {{percent}}% de potencia de minado por cada {{threshold}} MXI comprados',
     multiplePaymentMethods: 'Múltiples métodos de pago disponibles',
-    paymentMethodsDescription: 'Elige entre Binance Pay, Coinbase, Skrill o tarjeta de crédito',
+    paymentMethodsDescription: 'Elige entre Binance Pay, Coinbase, Skrill o PayPal',
     proceedToPayment: 'Proceder al pago',
   },
 
@@ -140,8 +140,7 @@ export default {
     binanceDescription: 'Paga con criptomoneda vía Binance Pay',
     coinbaseDescription: 'Paga con cripto usando Coinbase Commerce',
     skrillDescription: 'Paga con billetera digital Skrill',
-    stripeDescription: 'Paga con tarjeta de crédito o débito',
-    creditCard: 'Tarjeta de crédito/débito',
+    paypalDescription: 'Paga de forma segura con tu cuenta PayPal',
     comingSoon: 'Próximamente',
     securePayment: 'Pago seguro',
     securePaymentDescription: 'Todas las transacciones están encriptadas y son seguras. Tu información de pago nunca se almacena en nuestros servidores.',
@@ -157,7 +156,7 @@ export default {
     binanceSuccessMessage: '¡Tu pago de {{amount}} MXI vía Binance Pay ha sido procesado exitosamente!',
     coinbaseSuccessMessage: '¡Tu pago de {{amount}} MXI vía Coinbase ha sido procesado exitosamente!',
     skrillSuccessMessage: '¡Tu pago de {{amount}} MXI vía Skrill ha sido procesado exitosamente!',
-    stripeSuccessMessage: '¡Tu pago con tarjeta de {{amount}} MXI ha sido procesado exitosamente!',
+    paypalSuccessMessage: '¡Tu pago de {{amount}} MXI vía PayPal ha sido procesado exitosamente!',
   },
 
   // Pantalla de administrador

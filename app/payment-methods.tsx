@@ -15,7 +15,7 @@ import { IconSymbol } from '@/components/IconSymbol';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocalization } from '@/contexts/LocalizationContext';
 
-type PaymentMethod = 'binance' | 'coinbase' | 'skrill' | 'stripe';
+type PaymentMethod = 'binance' | 'coinbase' | 'skrill' | 'paypal';
 
 interface PaymentMethodOption {
   id: PaymentMethod;
@@ -61,11 +61,11 @@ export default function PaymentMethodsScreen() {
       available: true,
     },
     {
-      id: 'stripe',
-      name: t('payment.creditCard'),
-      icon: 'creditcard.circle.fill',
-      description: t('payment.stripeDescription'),
-      color: '#635BFF',
+      id: 'paypal',
+      name: 'PayPal',
+      icon: 'dollarsign.square.fill',
+      description: t('payment.paypalDescription'),
+      color: '#0070BA',
       available: true,
     },
   ];
@@ -93,8 +93,8 @@ export default function PaymentMethodsScreen() {
       case 'skrill':
         await processSkrillPayment();
         break;
-      case 'stripe':
-        await processStripePayment();
+      case 'paypal':
+        await processPayPalPayment();
         break;
     }
   };
@@ -183,14 +183,16 @@ export default function PaymentMethodsScreen() {
     }, 2000);
   };
 
-  const processStripePayment = async () => {
+  const processPayPalPayment = async () => {
     // In production, this would:
-    // 1. Create a Stripe Payment Intent via your backend
-    // 2. Use @stripe/stripe-react-native to show payment sheet
-    // 3. Confirm the payment
-    // 4. Handle the result
+    // 1. Create a PayPal order via your backend API
+    // 2. Get the approval URL from PayPal
+    // 3. Open the URL in browser or WebView using expo-web-browser
+    // 4. Handle the return URL callback
+    // 5. Capture the payment on your backend
+    // 6. Update user balance
     
-    console.log('Processing Stripe payment for', purchaseAmount, 'MXI');
+    console.log('Processing PayPal payment for', purchaseAmount, 'MXI');
     
     // Simulate API call
     setTimeout(async () => {
@@ -200,7 +202,7 @@ export default function PaymentMethodsScreen() {
       
       Alert.alert(
         t('payment.paymentSuccess'),
-        t('payment.stripeSuccessMessage', { amount: purchaseAmount.toFixed(2) }),
+        t('payment.paypalSuccessMessage', { amount: purchaseAmount.toFixed(2) }),
         [
           {
             text: t('common.ok'),
