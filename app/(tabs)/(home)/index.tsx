@@ -17,6 +17,7 @@ import { router } from "expo-router";
 import { useAuth } from "@/contexts/AuthContext";
 import { useMiningConfig } from "@/contexts/MiningConfigContext";
 import { useLocalization } from "@/contexts/LocalizationContext";
+import { useBinance } from "@/contexts/BinanceContext";
 import PriceChart from "@/components/PriceChart";
 import Animated, {
   useSharedValue,
@@ -31,10 +32,10 @@ export default function HomeScreen() {
   const { user, updateBalance, refreshUser } = useAuth();
   const { config } = useMiningConfig();
   const { t } = useLocalization();
+  const { mxiRate, isConnected, connectToBinance, convertMXIToUSD } = useBinance();
   const [isMining, setIsMining] = useState(false);
   const [miningProgress, setMiningProgress] = useState(0);
   const [minedAmount, setMinedAmount] = useState(0);
-  const [binanceConnected, setBinanceConnected] = useState(false);
 
   // Animation values
   const rotation = useSharedValue(0);
@@ -133,13 +134,15 @@ export default function HomeScreen() {
     console.log("Mining stopped");
   };
 
-  const connectBinance = () => {
-    setBinanceConnected(true);
-    Alert.alert(
-      t('home.binanceConnected'),
-      t('home.binanceConnectedMessage'),
-      [{ text: t('common.ok') }]
-    );
+  const handleConnectBinance = async () => {
+    if (!isConnected) {
+      await connectToBinance();
+      Alert.alert(
+        t('home.binanceConnected'),
+        t('home.binanceConnectedMessage'),
+        [{ text: t('common.ok') }]
+      );
+    }
   };
 
   const formatMiningRate = () => {
@@ -192,6 +195,12 @@ export default function HomeScreen() {
           
           <Text style={styles.balanceLabel}>{t('home.yourBalance')}</Text>
           <Text style={styles.balanceAmount}>{user.balance.toFixed(6)} MXI</Text>
+          
+          {isConnected && mxiRate && (
+            <Text style={styles.balanceUSD}>
+              ≈ ${convertMXIToUSD(user.balance).toFixed(2)} USD
+            </Text>
+          )}
           
           <View style={styles.levelBadge}>
             <IconSymbol name="star.fill" size={16} color={colors.accent} />
@@ -364,19 +373,26 @@ export default function HomeScreen() {
           
           <View style={styles.binanceStatus}>
             <IconSymbol 
-              name={binanceConnected ? "checkmark.circle.fill" : "xmark.circle.fill"} 
+              name={isConnected ? "checkmark.circle.fill" : "xmark.circle.fill"} 
               size={24} 
-              color={binanceConnected ? colors.success : colors.textSecondary} 
+              color={isConnected ? colors.success : colors.textSecondary} 
             />
-            <Text style={styles.statusText}>
-              {binanceConnected ? t('home.connected') : t('home.notConnected')}
-            </Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.statusText}>
+                {isConnected ? t('home.connected') : t('home.notConnected')}
+              </Text>
+              {isConnected && mxiRate && (
+                <Text style={styles.statusSubtext}>
+                  1 MXI = ${mxiRate.price.toFixed(2)} USD
+                </Text>
+              )}
+            </View>
           </View>
 
-          {!binanceConnected && (
+          {!isConnected && (
             <Pressable 
               style={[styles.button, styles.accentButton]}
-              onPress={connectBinance}
+              onPress={handleConnectBinance}
             >
               <IconSymbol name="link" size={20} color={colors.text} />
               <Text style={[styles.buttonText, { color: colors.text }]}>
@@ -385,14 +401,24 @@ export default function HomeScreen() {
             </Pressable>
           )}
 
-          {binanceConnected && (
-            <Pressable 
-              style={[styles.button, styles.secondaryButton]}
-              onPress={() => router.push("/formsheet")}
-            >
-              <IconSymbol name="arrow.up.circle.fill" size={20} color="#ffffff" />
-              <Text style={styles.buttonText}>{t('home.withdrawMXI')}</Text>
-            </Pressable>
+          {isConnected && (
+            <View style={styles.buttonGroup}>
+              <Pressable 
+                style={[styles.button, styles.primaryButton]}
+                onPress={() => router.push("/send-mxi")}
+              >
+                <IconSymbol name="paperplane.fill" size={20} color="#ffffff" />
+                <Text style={styles.buttonText}>Send MXI</Text>
+              </Pressable>
+              
+              <Pressable 
+                style={[styles.button, styles.secondaryButton]}
+                onPress={() => router.push("/formsheet")}
+              >
+                <IconSymbol name="arrow.up.circle.fill" size={20} color="#ffffff" />
+                <Text style={styles.buttonText}>{t('home.withdrawMXI')}</Text>
+              </Pressable>
+            </View>
           )}
         </View>
 
@@ -452,6 +478,12 @@ const styles = StyleSheet.create({
     fontSize: 36,
     fontWeight: '800',
     color: colors.primary,
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  balanceUSD: {
+    fontSize: 16,
+    color: colors.textSecondary,
     textAlign: 'center',
     marginBottom: 12,
   },
@@ -641,6 +673,11 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '500',
     color: colors.text,
+  },
+  statusSubtext: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    marginTop: 2,
   },
   infoCard: {
     flexDirection: 'row',

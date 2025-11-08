@@ -1,0 +1,558 @@
+
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TextInput,
+  Pressable,
+  Alert,
+} from 'react-native';
+import { router } from 'expo-router';
+import { colors } from '@/styles/commonStyles';
+import { IconSymbol } from '@/components/IconSymbol';
+import { useAuth } from '@/contexts/AuthContext';
+import { useBinance } from '@/contexts/BinanceContext';
+import { useMiningConfig } from '@/contexts/MiningConfigContext';
+import { useLocalization } from '@/contexts/LocalizationContext';
+
+export default function SendMXIScreen() {
+  const { user, updateBalance } = useAuth();
+  const { mxiRate, convertMXIToUSD, isConnected } = useBinance();
+  const { config } = useMiningConfig();
+  const { t } = useLocalization();
+  
+  const [recipientCode, setRecipientCode] = useState('');
+  const [amount, setAmount] = useState('');
+  const [description, setDescription] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  const mxiAmount = parseFloat(amount) || 0;
+  const usdValue = convertMXIToUSD(mxiAmount);
+  
+  // Calculate commission (using Level 1 commission rate as the "sale" commission)
+  const commissionRate = config.level1Commission;
+  const commissionAmount = (mxiAmount * commissionRate) / 100;
+  const recipientReceives = mxiAmount - commissionAmount;
+
+  const handleSendMXI = async () => {
+    if (!user) return;
+
+    // Validation
+    if (!recipientCode.trim()) {
+      Alert.alert(t('common.error'), t('sendMxi.enterRecipientCode'));
+      return;
+    }
+
+    if (!amount || isNaN(mxiAmount) || mxiAmount <= 0) {
+      Alert.alert(t('common.error'), t('sendMxi.enterValidAmount'));
+      return;
+    }
+
+    if (mxiAmount > user.balance) {
+      Alert.alert(t('common.error'), t('sendMxi.insufficientBalance'));
+      return;
+    }
+
+    if (!isConnected || !mxiRate) {
+      Alert.alert(t('common.error'), t('sendMxi.exchangeRateUnavailable'));
+      return;
+    }
+
+    setIsProcessing(true);
+
+    try {
+      // Simulate finding recipient by referral code
+      // In production, this would query your backend
+      const recipientFound = recipientCode.length >= 6;
+
+      if (!recipientFound) {
+        Alert.alert(t('common.error'), t('sendMxi.recipientNotFound'));
+        setIsProcessing(false);
+        return;
+      }
+
+      // Deduct from sender's balance
+      await updateBalance(-mxiAmount);
+
+      // Show success with real-time exchange rate
+      Alert.alert(
+        t('sendMxi.transferSuccess'),
+        t('sendMxi.transferSuccessMessage', {
+          amount: mxiAmount.toFixed(6),
+          usdValue: usdValue.toFixed(2),
+          recipient: recipientCode,
+          recipientReceives: recipientReceives.toFixed(6),
+          commission: commissionAmount.toFixed(6),
+          commissionRate: commissionRate,
+          exchangeRate: mxiRate.price.toFixed(2),
+        }),
+        [
+          {
+            text: t('common.ok'),
+            onPress: () => router.back(),
+          },
+        ]
+      );
+
+      console.log('MXI Transfer:', {
+        from: user.username,
+        to: recipientCode,
+        amount: mxiAmount,
+        usdValue: usdValue,
+        commission: commissionAmount,
+        exchangeRate: mxiRate.price,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error('Error sending MXI:', error);
+      Alert.alert(t('common.error'), t('sendMxi.transferFailed'));
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  if (!user) {
+    return null;
+  }
+
+  return (
+    <ScrollView style={styles.container}>
+      <View style={styles.content}>
+        {/* Header */}
+        <View style={styles.header}>
+          <IconSymbol name="arrow.left.arrow.right.circle.fill" size={80} color={colors.primary} />
+          <Text style={styles.title}>{t('sendMxi.title')}</Text>
+          <Text style={styles.subtitle}>{t('sendMxi.subtitle')}</Text>
+        </View>
+
+        {/* Exchange Rate Card */}
+        {isConnected && mxiRate && (
+          <View style={styles.rateCard}>
+            <View style={styles.rateHeader}>
+              <IconSymbol name="chart.line.uptrend.xyaxis" size={24} color={colors.success} />
+              <Text style={styles.rateTitle}>{t('sendMxi.currentExchangeRate')}</Text>
+            </View>
+            <View style={styles.rateContent}>
+              <Text style={styles.rateValue}>
+                1 MXI = ${mxiRate.price.toFixed(2)} USD
+              </Text>
+              <View style={[
+                styles.rateChange,
+                { backgroundColor: mxiRate.priceChangePercent24h >= 0 ? colors.success + '20' : colors.danger + '20' }
+              ]}>
+                <Text style={[
+                  styles.rateChangeText,
+                  { color: mxiRate.priceChangePercent24h >= 0 ? colors.success : colors.danger }
+                ]}>
+                  {mxiRate.priceChangePercent24h >= 0 ? '+' : ''}
+                  {mxiRate.priceChangePercent24h.toFixed(2)}% (24h)
+                </Text>
+              </View>
+            </View>
+            <Text style={styles.rateUpdate}>
+              {t('sendMxi.lastUpdate')}: {mxiRate.lastUpdate.toLocaleTimeString()}
+            </Text>
+          </View>
+        )}
+
+        {!isConnected && (
+          <View style={styles.warningCard}>
+            <IconSymbol name="exclamationmark.triangle.fill" size={24} color={colors.danger} />
+            <Text style={styles.warningText}>{t('sendMxi.notConnectedWarning')}</Text>
+          </View>
+        )}
+
+        {/* Balance Card */}
+        <View style={styles.balanceCard}>
+          <Text style={styles.balanceLabel}>{t('sendMxi.availableBalance')}</Text>
+          <Text style={styles.balanceAmount}>{user.balance.toFixed(6)} MXI</Text>
+          {isConnected && mxiRate && (
+            <Text style={styles.balanceUSD}>
+              ≈ ${convertMXIToUSD(user.balance).toFixed(2)} USD
+            </Text>
+          )}
+        </View>
+
+        {/* Transfer Form */}
+        <View style={styles.formSection}>
+          <Text style={styles.label}>{t('sendMxi.recipientReferralCode')}</Text>
+          <View style={styles.inputContainer}>
+            <IconSymbol name="person.circle.fill" size={24} color={colors.textSecondary} />
+            <TextInput
+              style={styles.input}
+              value={recipientCode}
+              onChangeText={setRecipientCode}
+              placeholder={t('sendMxi.enterRecipientCode')}
+              placeholderTextColor={colors.textSecondary}
+              autoCapitalize="characters"
+            />
+          </View>
+        </View>
+
+        <View style={styles.formSection}>
+          <Text style={styles.label}>{t('sendMxi.amount')}</Text>
+          <View style={styles.inputContainer}>
+            <IconSymbol name="bitcoinsign.circle.fill" size={24} color={colors.primary} />
+            <TextInput
+              style={styles.input}
+              value={amount}
+              onChangeText={setAmount}
+              placeholder="0.000000"
+              placeholderTextColor={colors.textSecondary}
+              keyboardType="decimal-pad"
+            />
+            <Text style={styles.currency}>MXI</Text>
+          </View>
+          {mxiAmount > 0 && isConnected && mxiRate && (
+            <Text style={styles.helperText}>
+              ≈ ${usdValue.toFixed(2)} USD {t('sendMxi.atCurrentRate')}
+            </Text>
+          )}
+        </View>
+
+        <View style={styles.formSection}>
+          <Text style={styles.label}>{t('sendMxi.description')} ({t('sendMxi.optional')})</Text>
+          <TextInput
+            style={[styles.input, styles.descriptionInput]}
+            value={description}
+            onChangeText={setDescription}
+            placeholder={t('sendMxi.descriptionPlaceholder')}
+            placeholderTextColor={colors.textSecondary}
+            multiline
+            numberOfLines={3}
+          />
+        </View>
+
+        {/* Transaction Summary */}
+        {mxiAmount > 0 && (
+          <View style={styles.summaryCard}>
+            <Text style={styles.summaryTitle}>{t('sendMxi.transactionSummary')}</Text>
+            
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>{t('sendMxi.sendingAmount')}</Text>
+              <Text style={styles.summaryValue}>{mxiAmount.toFixed(6)} MXI</Text>
+            </View>
+
+            {isConnected && mxiRate && (
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>{t('sendMxi.usdValue')}</Text>
+                <Text style={styles.summaryValue}>${usdValue.toFixed(2)}</Text>
+              </View>
+            )}
+
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>
+                {t('sendMxi.commission')} ({commissionRate}%)
+              </Text>
+              <Text style={[styles.summaryValue, { color: colors.danger }]}>
+                -{commissionAmount.toFixed(6)} MXI
+              </Text>
+            </View>
+
+            <View style={styles.divider} />
+
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabelBold}>{t('sendMxi.recipientReceives')}</Text>
+              <Text style={styles.summaryValueBold}>
+                {recipientReceives.toFixed(6)} MXI
+              </Text>
+            </View>
+
+            {isConnected && mxiRate && (
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>{t('sendMxi.recipientUsdValue')}</Text>
+                <Text style={styles.summaryValue}>
+                  ≈ ${convertMXIToUSD(recipientReceives).toFixed(2)} USD
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* Info Card */}
+        <View style={styles.infoCard}>
+          <IconSymbol name="info.circle.fill" size={24} color={colors.primary} />
+          <View style={styles.infoContent}>
+            <Text style={styles.infoTitle}>{t('sendMxi.aboutCommissions')}</Text>
+            <Text style={styles.infoText}>{t('sendMxi.commissionInfo', { rate: commissionRate })}</Text>
+          </View>
+        </View>
+
+        {/* Action Buttons */}
+        <View style={styles.buttonGroup}>
+          <Pressable
+            style={[
+              styles.button,
+              styles.primaryButton,
+              (isProcessing || !isConnected || mxiAmount <= 0) && styles.buttonDisabled,
+            ]}
+            onPress={handleSendMXI}
+            disabled={isProcessing || !isConnected || mxiAmount <= 0}
+          >
+            <IconSymbol name="paperplane.fill" size={20} color="#ffffff" />
+            <Text style={styles.buttonText}>
+              {isProcessing ? t('sendMxi.processing') : t('sendMxi.sendMxi')}
+            </Text>
+          </Pressable>
+
+          <Pressable
+            style={[styles.button, styles.secondaryButton]}
+            onPress={() => router.back()}
+            disabled={isProcessing}
+          >
+            <Text style={[styles.buttonText, { color: colors.text }]}>
+              {t('common.cancel')}
+            </Text>
+          </Pressable>
+        </View>
+      </View>
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  content: {
+    padding: 20,
+    paddingBottom: 40,
+  },
+  header: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: colors.text,
+    marginTop: 16,
+    textAlign: 'center',
+  },
+  subtitle: {
+    fontSize: 16,
+    color: colors.textSecondary,
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  rateCard: {
+    backgroundColor: colors.card,
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
+    elevation: 3,
+  },
+  rateHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 12,
+  },
+  rateTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  rateContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  rateValue: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: colors.primary,
+  },
+  rateChange: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  rateChangeText: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  rateUpdate: {
+    fontSize: 12,
+    color: colors.textSecondary,
+  },
+  warningCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.danger + '20',
+    borderRadius: 12,
+    padding: 16,
+    gap: 12,
+    marginBottom: 16,
+  },
+  warningText: {
+    flex: 1,
+    fontSize: 14,
+    color: colors.danger,
+    fontWeight: '600',
+  },
+  balanceCard: {
+    backgroundColor: colors.highlight,
+    borderRadius: 16,
+    padding: 20,
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  balanceLabel: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginBottom: 8,
+  },
+  balanceAmount: {
+    fontSize: 32,
+    fontWeight: '800',
+    color: colors.primary,
+    marginBottom: 4,
+  },
+  balanceUSD: {
+    fontSize: 16,
+    color: colors.textSecondary,
+  },
+  formSection: {
+    marginBottom: 20,
+  },
+  label: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 8,
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: colors.highlight,
+    paddingHorizontal: 16,
+    gap: 12,
+  },
+  input: {
+    flex: 1,
+    fontSize: 16,
+    color: colors.text,
+    paddingVertical: 14,
+  },
+  descriptionInput: {
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: colors.highlight,
+    padding: 14,
+    minHeight: 80,
+    textAlignVertical: 'top',
+  },
+  currency: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.primary,
+  },
+  helperText: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    marginTop: 6,
+  },
+  summaryCard: {
+    backgroundColor: colors.card,
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
+    elevation: 3,
+  },
+  summaryTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: 16,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  summaryLabel: {
+    fontSize: 15,
+    color: colors.textSecondary,
+  },
+  summaryValue: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  summaryLabelBold: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  summaryValueBold: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: colors.success,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: colors.background,
+    marginVertical: 12,
+  },
+  infoCard: {
+    flexDirection: 'row',
+    backgroundColor: colors.highlight,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 24,
+    gap: 12,
+  },
+  infoContent: {
+    flex: 1,
+  },
+  infoTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: 4,
+  },
+  infoText: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    lineHeight: 18,
+  },
+  buttonGroup: {
+    gap: 12,
+  },
+  button: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    borderRadius: 12,
+    gap: 8,
+  },
+  primaryButton: {
+    backgroundColor: colors.primary,
+  },
+  secondaryButton: {
+    backgroundColor: colors.card,
+    borderWidth: 2,
+    borderColor: colors.textSecondary,
+  },
+  buttonDisabled: {
+    opacity: 0.5,
+  },
+  buttonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+});

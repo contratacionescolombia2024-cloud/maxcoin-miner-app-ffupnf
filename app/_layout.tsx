@@ -20,6 +20,7 @@ import { WidgetProvider } from "@/contexts/WidgetContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { MiningConfigProvider } from "@/contexts/MiningConfigContext";
 import { LocalizationProvider } from "@/contexts/LocalizationContext";
+import { BinanceProvider } from "@/contexts/BinanceContext";
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -89,9 +90,10 @@ export default function RootLayout() {
         >
           <LocalizationProvider>
             <MiningConfigProvider>
-              <AuthProvider>
-                <WidgetProvider>
-                  <GestureHandlerRootView>
+              <BinanceProvider>
+                <AuthProvider>
+                  <WidgetProvider>
+                    <GestureHandlerRootView>
                 <Stack>
                 {/* Auth screens */}
                 <Stack.Screen name="(auth)" options={{ headerShown: false }} />
@@ -138,12 +140,27 @@ export default function RootLayout() {
                     title: "Purchase MXI",
                   }}
                 />
+                <Stack.Screen
+                  name="payment-methods"
+                  options={{
+                    presentation: "modal",
+                    title: "Payment Methods",
+                  }}
+                />
+                <Stack.Screen
+                  name="send-mxi"
+                  options={{
+                    presentation: "modal",
+                    title: "Send MXI",
+                  }}
+                />
                 </Stack>
                 <SystemBars style={"auto"} />
                 </GestureHandlerRootView>
-              </WidgetProvider>
-            </AuthProvider>
-          </MiningConfigProvider>
+                  </WidgetProvider>
+                </AuthProvider>
+              </BinanceProvider>
+            </MiningConfigProvider>
           </LocalizationProvider>
         </ThemeProvider>
     </>

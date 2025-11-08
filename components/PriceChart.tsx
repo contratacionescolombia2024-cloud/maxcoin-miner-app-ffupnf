@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Dimensions, ActivityIndicator } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
 import { colors } from '@/styles/commonStyles';
+import { useBinance } from '@/contexts/BinanceContext';
 
 interface PriceData {
   time: string;
@@ -10,6 +11,7 @@ interface PriceData {
 }
 
 export default function PriceChart() {
+  const { mxiRate, isConnected } = useBinance();
   const [priceData, setPriceData] = useState<PriceData[]>([]);
   const [currentPrice, setCurrentPrice] = useState<number>(0);
   const [priceChange, setPriceChange] = useState<number>(0);
@@ -17,11 +19,13 @@ export default function PriceChart() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchInitialData();
-    const interval = setInterval(fetchPriceUpdate, 5000); // Update every 5 seconds
+    if (isConnected) {
+      fetchInitialData();
+      const interval = setInterval(fetchPriceUpdate, 5000); // Update every 5 seconds
 
-    return () => clearInterval(interval);
-  }, []);
+      return () => clearInterval(interval);
+    }
+  }, [isConnected]);
 
   const fetchInitialData = async () => {
     try {
@@ -132,9 +136,9 @@ export default function PriceChart() {
     <View style={styles.container}>
       <View style={styles.priceHeader}>
         <View>
-          <Text style={styles.priceLabel}>BTC/USDT (Reference)</Text>
+          <Text style={styles.priceLabel}>MXI/USDT</Text>
           <Text style={styles.currentPrice}>
-            ${currentPrice.toLocaleString('en-US', { 
+            ${mxiRate ? mxiRate.price.toFixed(2) : currentPrice.toLocaleString('en-US', { 
               minimumFractionDigits: 2,
               maximumFractionDigits: 2 
             })}
@@ -142,13 +146,14 @@ export default function PriceChart() {
         </View>
         <View style={[
           styles.changeContainer,
-          { backgroundColor: priceChange >= 0 ? colors.success + '20' : colors.danger + '20' }
+          { backgroundColor: (mxiRate ? mxiRate.priceChangePercent24h : priceChange) >= 0 ? colors.success + '20' : colors.danger + '20' }
         ]}>
           <Text style={[
             styles.changeText,
-            { color: priceChange >= 0 ? colors.success : colors.danger }
+            { color: (mxiRate ? mxiRate.priceChangePercent24h : priceChange) >= 0 ? colors.success : colors.danger }
           ]}>
-            {priceChange >= 0 ? '+' : ''}{priceChange.toFixed(2)}%
+            {(mxiRate ? mxiRate.priceChangePercent24h : priceChange) >= 0 ? '+' : ''}
+            {(mxiRate ? mxiRate.priceChangePercent24h : priceChange).toFixed(2)}%
           </Text>
         </View>
       </View>
@@ -201,7 +206,8 @@ export default function PriceChart() {
       )}
 
       <Text style={styles.updateText}>
-        Updates every 5 seconds • Powered by Binance
+        {mxiRate && `Last update: ${mxiRate.lastUpdate.toLocaleTimeString()} • `}
+        Powered by Binance
       </Text>
     </View>
   );
