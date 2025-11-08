@@ -6,10 +6,10 @@ export interface User {
   id: string;
   username: string;
   balance: number;
-  miningPower: number; // Multiplier based on purchases
+  miningPower: number;
   referralCode: string;
   referredBy?: string;
-  referrals: string[]; // Direct referrals
+  referrals: string[];
   referralEarnings: number;
   totalPurchases: number;
   createdAt: string;
@@ -34,7 +34,6 @@ const STORAGE_KEYS = {
   USERS: '@maxcoin_users',
 };
 
-// Generate a unique referral code
 const generateReferralCode = (username: string): string => {
   const random = Math.random().toString(36).substring(2, 8).toUpperCase();
   return `${username.substring(0, 3).toUpperCase()}${random}`;
@@ -44,7 +43,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Load current user on mount
   useEffect(() => {
     loadCurrentUser();
   }, []);
@@ -88,16 +86,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const register = async (username: string, password: string, referralCode?: string): Promise<boolean> => {
     try {
-      // Get existing users
       const usersData = await AsyncStorage.getItem(STORAGE_KEYS.USERS);
       const users: User[] = usersData ? JSON.parse(usersData) : [];
 
-      // Check if username already exists
       if (users.some(u => u.username.toLowerCase() === username.toLowerCase())) {
         return false;
       }
 
-      // Validate referral code if provided
       let referredByUserId: string | undefined;
       if (referralCode) {
         const referrer = users.find(u => u.referralCode === referralCode.toUpperCase());
@@ -106,7 +101,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
       }
 
-      // Create new user
       const newUser: User = {
         id: Date.now().toString(),
         username,
@@ -120,7 +114,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         createdAt: new Date().toISOString(),
       };
 
-      // Add referral relationship
       if (referredByUserId) {
         const referrerIndex = users.findIndex(u => u.id === referredByUserId);
         if (referrerIndex !== -1) {
@@ -128,13 +121,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
       }
 
-      // Save password separately (in production, use proper encryption)
       const passwordsData = await AsyncStorage.getItem('@maxcoin_passwords');
       const passwords = passwordsData ? JSON.parse(passwordsData) : {};
       passwords[newUser.id] = password;
       await AsyncStorage.setItem('@maxcoin_passwords', JSON.stringify(passwords));
 
-      // Save users
       users.push(newUser);
       await AsyncStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
       await AsyncStorage.setItem(STORAGE_KEYS.CURRENT_USER, newUser.id);
@@ -157,7 +148,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       if (!foundUser) return false;
 
-      // Check password
       const passwordsData = await AsyncStorage.getItem('@maxcoin_passwords');
       const passwords = passwordsData ? JSON.parse(passwordsData) : {};
       
@@ -212,28 +202,39 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const userIndex = users.findIndex(u => u.id === user.id);
 
       if (userIndex !== -1) {
-        // Update user's balance and mining power
         users[userIndex].balance += amount;
         users[userIndex].totalPurchases += amount;
-        // Mining power increases by 10% for every 10 MXI purchased
         users[userIndex].miningPower = 1 + (users[userIndex].totalPurchases / 10) * 0.1;
 
-        // Process referral commissions
-        // 5% for direct referrer
+        // 3-Level Referral System
+        // Level 1: 5% commission
         if (users[userIndex].referredBy) {
-          const referrerIndex = users.findIndex(u => u.id === users[userIndex].referredBy);
-          if (referrerIndex !== -1) {
-            const commission = amount * 0.05;
-            users[referrerIndex].balance += commission;
-            users[referrerIndex].referralEarnings += commission;
+          const level1Index = users.findIndex(u => u.id === users[userIndex].referredBy);
+          if (level1Index !== -1) {
+            const level1Commission = amount * 0.05;
+            users[level1Index].balance += level1Commission;
+            users[level1Index].referralEarnings += level1Commission;
+            console.log(`Level 1 referral commission: ${level1Commission} MXI`);
 
-            // 2% for second-level referrer
-            if (users[referrerIndex].referredBy) {
-              const secondLevelIndex = users.findIndex(u => u.id === users[referrerIndex].referredBy);
-              if (secondLevelIndex !== -1) {
-                const secondLevelCommission = amount * 0.02;
-                users[secondLevelIndex].balance += secondLevelCommission;
-                users[secondLevelIndex].referralEarnings += secondLevelCommission;
+            // Level 2: 2% commission
+            if (users[level1Index].referredBy) {
+              const level2Index = users.findIndex(u => u.id === users[level1Index].referredBy);
+              if (level2Index !== -1) {
+                const level2Commission = amount * 0.02;
+                users[level2Index].balance += level2Commission;
+                users[level2Index].referralEarnings += level2Commission;
+                console.log(`Level 2 referral commission: ${level2Commission} MXI`);
+
+                // Level 3: 1% commission
+                if (users[level2Index].referredBy) {
+                  const level3Index = users.findIndex(u => u.id === users[level2Index].referredBy);
+                  if (level3Index !== -1) {
+                    const level3Commission = amount * 0.01;
+                    users[level3Index].balance += level3Commission;
+                    users[level3Index].referralEarnings += level3Commission;
+                    console.log(`Level 3 referral commission: ${level3Commission} MXI`);
+                  }
+                }
               }
             }
           }

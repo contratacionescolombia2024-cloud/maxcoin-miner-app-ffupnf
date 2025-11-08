@@ -15,6 +15,7 @@ import { IconSymbol } from "@/components/IconSymbol";
 import { colors } from "@/styles/commonStyles";
 import { router } from "expo-router";
 import { useAuth } from "@/contexts/AuthContext";
+import PriceChart from "@/components/PriceChart";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -28,7 +29,7 @@ export default function HomeScreen() {
   const { user, updateBalance, refreshUser } = useAuth();
   const [isMining, setIsMining] = useState(false);
   const [miningProgress, setMiningProgress] = useState(0);
-  const [timeRemaining, setTimeRemaining] = useState(7200); // 2 hours in seconds
+  const [minedAmount, setMinedAmount] = useState(0);
   const [binanceConnected, setBinanceConnected] = useState(false);
 
   // Animation values
@@ -76,33 +77,25 @@ export default function HomeScreen() {
     };
   });
 
-  // Mining timer
+  // Mining timer - 0.02 MXI per minute
   useEffect(() => {
     let interval: NodeJS.Timeout;
     
-    if (isMining && timeRemaining > 0) {
+    if (isMining && user) {
       interval = setInterval(() => {
-        setTimeRemaining((prev) => {
-          const newTime = prev - 1;
-          const progress = ((7200 - newTime) / 7200) * 100;
-          setMiningProgress(progress);
-          
-          // Complete mining cycle
-          if (newTime <= 0) {
-            const miningReward = 0.1 * (user?.miningPower || 1);
-            updateBalance(miningReward);
-            setIsMining(false);
-            setTimeRemaining(7200);
-            setMiningProgress(0);
-            Alert.alert(
-              "Mining Complete!",
-              `You have mined ${miningReward.toFixed(4)} MXI! Start mining again to earn more.`,
-              [{ text: "OK" }]
-            );
-            return 7200;
-          }
-          
-          return newTime;
+        // Update every second, mining rate is 0.02 per minute
+        const miningRate = 0.02 * user.miningPower; // MXI per minute
+        const incrementPerSecond = miningRate / 60; // MXI per second
+        
+        setMinedAmount(prev => {
+          const newAmount = prev + incrementPerSecond;
+          return newAmount;
+        });
+        
+        // Update progress (arbitrary scale for visual feedback)
+        setMiningProgress(prev => {
+          const newProgress = (prev + 0.1) % 100;
+          return newProgress;
         });
       }, 1000);
     }
@@ -110,17 +103,29 @@ export default function HomeScreen() {
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [isMining, timeRemaining, user]);
+  }, [isMining, user]);
 
   const startMining = () => {
     if (!isMining) {
       setIsMining(true);
-      console.log("Mining started");
+      setMinedAmount(0);
+      setMiningProgress(0);
+      console.log("Mining started - Rate: 0.02 MXI per minute");
     }
   };
 
   const stopMining = () => {
+    if (isMining && minedAmount > 0) {
+      updateBalance(minedAmount);
+      Alert.alert(
+        "Mining Stopped",
+        `You have mined ${minedAmount.toFixed(6)} MXI!\n\nYour balance has been updated.`,
+        [{ text: "OK" }]
+      );
+    }
     setIsMining(false);
+    setMinedAmount(0);
+    setMiningProgress(0);
     console.log("Mining stopped");
   };
 
@@ -133,11 +138,10 @@ export default function HomeScreen() {
     );
   };
 
-  const formatTime = (seconds: number) => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  const formatMiningRate = () => {
+    if (!user) return "0.0000";
+    const ratePerMinute = 0.02 * user.miningPower;
+    return ratePerMinute.toFixed(6);
   };
 
   const renderHeaderRight = () => (
@@ -183,11 +187,81 @@ export default function HomeScreen() {
           </View>
           
           <Text style={styles.balanceLabel}>Your Balance</Text>
-          <Text style={styles.balanceAmount}>{user.balance.toFixed(4)} MXI</Text>
+          <Text style={styles.balanceAmount}>{user.balance.toFixed(6)} MXI</Text>
           
           <View style={styles.levelBadge}>
             <IconSymbol name="star.fill" size={16} color={colors.accent} />
             <Text style={styles.levelText}>Mining Power: {user.miningPower.toFixed(2)}x</Text>
+          </View>
+        </View>
+
+        {/* Real-Time Price Chart */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Market Price (Reference)</Text>
+          <Text style={styles.cardSubtitle}>
+            Live cryptocurrency price from Binance
+          </Text>
+          <PriceChart />
+        </View>
+
+        {/* Mining Progress Card */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Mining Progress</Text>
+          
+          <View style={styles.miningStatsContainer}>
+            <View style={styles.miningStatBox}>
+              <IconSymbol name="clock.fill" size={24} color={colors.primary} />
+              <Text style={styles.miningStatValue}>
+                {isMining ? minedAmount.toFixed(6) : '0.000000'}
+              </Text>
+              <Text style={styles.miningStatLabel}>Mined This Session</Text>
+            </View>
+          </View>
+
+          <View style={styles.progressBarContainer}>
+            <View 
+              style={[
+                styles.progressBar, 
+                { width: `${miningProgress}%` }
+              ]} 
+            />
+          </View>
+          
+          <View style={styles.miningInfo}>
+            <View style={styles.infoRow}>
+              <IconSymbol name="gauge" size={20} color={colors.textSecondary} />
+              <Text style={styles.infoText}>
+                Status: {isMining ? 'Mining Active' : 'Idle'}
+              </Text>
+            </View>
+            
+            <View style={styles.infoRow}>
+              <IconSymbol name="chart.bar.fill" size={20} color={colors.textSecondary} />
+              <Text style={styles.infoText}>
+                Rate: {formatMiningRate()} MXI / minute
+              </Text>
+            </View>
+          </View>
+
+          {/* Mining Controls */}
+          <View style={styles.buttonGroup}>
+            {!isMining ? (
+              <Pressable 
+                style={[styles.button, styles.primaryButton]}
+                onPress={startMining}
+              >
+                <IconSymbol name="play.fill" size={20} color="#ffffff" />
+                <Text style={styles.buttonText}>Start Mining</Text>
+              </Pressable>
+            ) : (
+              <Pressable 
+                style={[styles.button, styles.dangerButton]}
+                onPress={stopMining}
+              >
+                <IconSymbol name="stop.fill" size={20} color="#ffffff" />
+                <Text style={styles.buttonText}>Stop Mining & Collect</Text>
+              </Pressable>
+            )}
           </View>
         </View>
 
@@ -247,7 +321,7 @@ export default function HomeScreen() {
 
             <View style={styles.referralStatItem}>
               <IconSymbol name="dollarsign.circle.fill" size={24} color={colors.success} />
-              <Text style={styles.referralStatValue}>{user.referralEarnings.toFixed(4)}</Text>
+              <Text style={styles.referralStatValue}>{user.referralEarnings.toFixed(6)}</Text>
               <Text style={styles.referralStatLabel}>Earned (MXI)</Text>
             </View>
           </View>
@@ -255,59 +329,8 @@ export default function HomeScreen() {
           <View style={styles.infoBox}>
             <IconSymbol name="info.circle.fill" size={20} color={colors.primary} />
             <Text style={styles.infoBoxText}>
-              Earn 5% from direct referrals and 2% from their referrals!
+              Earn 5% from Level 1, 2% from Level 2, and 1% from Level 3 referrals!
             </Text>
-          </View>
-        </View>
-
-        {/* Mining Progress Card */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Mining Progress</Text>
-          
-          <View style={styles.progressBarContainer}>
-            <View 
-              style={[
-                styles.progressBar, 
-                { width: `${miningProgress}%` }
-              ]} 
-            />
-          </View>
-          
-          <View style={styles.miningInfo}>
-            <View style={styles.infoRow}>
-              <IconSymbol name="clock.fill" size={20} color={colors.textSecondary} />
-              <Text style={styles.infoText}>
-                {isMining ? `Time Remaining: ${formatTime(timeRemaining)}` : 'Not Mining'}
-              </Text>
-            </View>
-            
-            <View style={styles.infoRow}>
-              <IconSymbol name="chart.bar.fill" size={20} color={colors.textSecondary} />
-              <Text style={styles.infoText}>
-                Rate: {(0.1 * user.miningPower).toFixed(4)} MXI / 2 hours
-              </Text>
-            </View>
-          </View>
-
-          {/* Mining Controls */}
-          <View style={styles.buttonGroup}>
-            {!isMining ? (
-              <Pressable 
-                style={[styles.button, styles.primaryButton]}
-                onPress={startMining}
-              >
-                <IconSymbol name="play.fill" size={20} color="#ffffff" />
-                <Text style={styles.buttonText}>Start Mining</Text>
-              </Pressable>
-            ) : (
-              <Pressable 
-                style={[styles.button, styles.dangerButton]}
-                onPress={stopMining}
-              >
-                <IconSymbol name="stop.fill" size={20} color="#ffffff" />
-                <Text style={styles.buttonText}>Stop Mining</Text>
-              </Pressable>
-            )}
           </View>
         </View>
 
@@ -353,7 +376,7 @@ export default function HomeScreen() {
         <View style={[styles.card, styles.infoCard]}>
           <IconSymbol name="info.circle.fill" size={24} color={colors.primary} />
           <Text style={styles.infoCardText}>
-            Keep the app open to mine Maxcoin MXI. Your mining power increases with purchases!
+            Keep the app open to mine Maxcoin MXI at 0.02 MXI per minute. Your mining power increases with purchases!
           </Text>
         </View>
       </ScrollView>
@@ -423,6 +446,25 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: colors.text,
+  },
+  miningStatsContainer: {
+    marginBottom: 16,
+  },
+  miningStatBox: {
+    backgroundColor: colors.background,
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    gap: 8,
+  },
+  miningStatValue: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: colors.accent,
+  },
+  miningStatLabel: {
+    fontSize: 12,
+    color: colors.textSecondary,
   },
   purchaseGrid: {
     flexDirection: 'row',
