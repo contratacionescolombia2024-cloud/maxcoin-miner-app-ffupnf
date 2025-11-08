@@ -18,6 +18,7 @@ import { StatusBar } from "expo-status-bar";
 import { Button } from "@/components/button";
 import { WidgetProvider } from "@/contexts/WidgetContext";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { MiningConfigProvider } from "@/contexts/MiningConfigContext";
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -85,10 +86,11 @@ export default function RootLayout() {
         <ThemeProvider
           value={colorScheme === "dark" ? CustomDarkTheme : CustomDefaultTheme}
         >
-          <AuthProvider>
-            <WidgetProvider>
-              <GestureHandlerRootView>
-              <Stack>
+          <MiningConfigProvider>
+            <AuthProvider>
+              <WidgetProvider>
+                <GestureHandlerRootView>
+                <Stack>
                 {/* Auth screens */}
                 <Stack.Screen name="(auth)" options={{ headerShown: false }} />
 
@@ -120,11 +122,26 @@ export default function RootLayout() {
                     headerShown: false,
                   }}
                 />
-              </Stack>
-              <SystemBars style={"auto"} />
-              </GestureHandlerRootView>
-            </WidgetProvider>
-          </AuthProvider>
+                <Stack.Screen
+                  name="admin"
+                  options={{
+                    presentation: "modal",
+                    title: "Admin Panel",
+                  }}
+                />
+                <Stack.Screen
+                  name="purchase"
+                  options={{
+                    presentation: "modal",
+                    title: "Purchase MXI",
+                  }}
+                />
+                </Stack>
+                <SystemBars style={"auto"} />
+                </GestureHandlerRootView>
+              </WidgetProvider>
+            </AuthProvider>
+          </MiningConfigProvider>
         </ThemeProvider>
     </>
   );

@@ -1,6 +1,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useMiningConfig } from './MiningConfigContext';
 
 export interface User {
   id: string;
@@ -42,6 +43,7 @@ const generateReferralCode = (username: string): string => {
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const miningConfigContext = useMiningConfig();
 
   useEffect(() => {
     loadCurrentUser();
@@ -202,37 +204,42 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const userIndex = users.findIndex(u => u.id === user.id);
 
       if (userIndex !== -1) {
+        const config = miningConfigContext.config;
+        
         users[userIndex].balance += amount;
         users[userIndex].totalPurchases += amount;
-        users[userIndex].miningPower = 1 + (users[userIndex].totalPurchases / 10) * 0.1;
+        
+        // Calculate mining power based on config
+        const powerIncrease = (users[userIndex].totalPurchases / config.powerIncreaseThreshold) * (config.powerIncreasePercent / 100);
+        users[userIndex].miningPower = 1 + powerIncrease;
 
-        // 3-Level Referral System
-        // Level 1: 5% commission
+        // 3-Level Referral System with configurable commissions
+        // Level 1 commission
         if (users[userIndex].referredBy) {
           const level1Index = users.findIndex(u => u.id === users[userIndex].referredBy);
           if (level1Index !== -1) {
-            const level1Commission = amount * 0.05;
+            const level1Commission = amount * (config.level1Commission / 100);
             users[level1Index].balance += level1Commission;
             users[level1Index].referralEarnings += level1Commission;
-            console.log(`Level 1 referral commission: ${level1Commission} MXI`);
+            console.log(`Level 1 referral commission: ${level1Commission} MXI (${config.level1Commission}%)`);
 
-            // Level 2: 2% commission
+            // Level 2 commission
             if (users[level1Index].referredBy) {
               const level2Index = users.findIndex(u => u.id === users[level1Index].referredBy);
               if (level2Index !== -1) {
-                const level2Commission = amount * 0.02;
+                const level2Commission = amount * (config.level2Commission / 100);
                 users[level2Index].balance += level2Commission;
                 users[level2Index].referralEarnings += level2Commission;
-                console.log(`Level 2 referral commission: ${level2Commission} MXI`);
+                console.log(`Level 2 referral commission: ${level2Commission} MXI (${config.level2Commission}%)`);
 
-                // Level 3: 1% commission
+                // Level 3 commission
                 if (users[level2Index].referredBy) {
                   const level3Index = users.findIndex(u => u.id === users[level2Index].referredBy);
                   if (level3Index !== -1) {
-                    const level3Commission = amount * 0.01;
+                    const level3Commission = amount * (config.level3Commission / 100);
                     users[level3Index].balance += level3Commission;
                     users[level3Index].referralEarnings += level3Commission;
-                    console.log(`Level 3 referral commission: ${level3Commission} MXI`);
+                    console.log(`Level 3 referral commission: ${level3Commission} MXI (${config.level3Commission}%)`);
                   }
                 }
               }

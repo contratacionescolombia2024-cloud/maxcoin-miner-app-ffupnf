@@ -7,22 +7,50 @@ import {
   Pressable,
   Alert,
   ScrollView,
+  TextInput,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { colors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
+import { useMiningConfig } from '@/contexts/MiningConfigContext';
 
 export default function PurchaseScreen() {
-  const { amount } = useLocalSearchParams<{ amount: string }>();
+  const { amount: paramAmount } = useLocalSearchParams<{ amount: string }>();
   const { purchaseMaxcoin, user } = useAuth();
+  const { config } = useMiningConfig();
   const [isProcessing, setIsProcessing] = useState(false);
+  const [customAmount, setCustomAmount] = useState(paramAmount || '10');
+  const [error, setError] = useState('');
 
-  const purchaseAmount = parseFloat(amount || '10');
-  const miningPowerIncrease = (purchaseAmount / 10) * 0.1;
+  const purchaseAmount = parseFloat(customAmount || '10');
+  const isValidAmount = purchaseAmount >= config.minPurchase && purchaseAmount <= config.maxPurchase;
+  
+  // Calculate mining power increase based on config
+  const miningPowerIncrease = (purchaseAmount / config.powerIncreaseThreshold) * (config.powerIncreasePercent / 100);
   const newMiningPower = (user?.miningPower || 1) + miningPowerIncrease;
 
+  const handleAmountChange = (text: string) => {
+    setCustomAmount(text);
+    const amount = parseFloat(text);
+    
+    if (isNaN(amount)) {
+      setError('Please enter a valid number');
+    } else if (amount < config.minPurchase) {
+      setError(`Minimum purchase is ${config.minPurchase} MXI`);
+    } else if (amount > config.maxPurchase) {
+      setError(`Maximum purchase is ${config.maxPurchase} MXI per transaction`);
+    } else {
+      setError('');
+    }
+  };
+
   const handlePurchase = async () => {
+    if (!isValidAmount) {
+      Alert.alert('Invalid Amount', error || 'Please enter a valid amount');
+      return;
+    }
+
     setIsProcessing(true);
 
     // Simulate payment processing
@@ -51,12 +79,78 @@ export default function PurchaseScreen() {
           <Text style={styles.title}>Purchase Maxcoin</Text>
         </View>
 
+        {/* Custom Amount Input */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Enter Amount</Text>
+          <Text style={styles.cardSubtitle}>
+            Min: {config.minPurchase} MXI | Max: {config.maxPurchase} MXI per transaction
+          </Text>
+
+          <View style={styles.inputContainer}>
+            <IconSymbol name="bitcoinsign.circle.fill" size={24} color={colors.primary} />
+            <TextInput
+              style={styles.input}
+              value={customAmount}
+              onChangeText={handleAmountChange}
+              placeholder={`Enter amount (${config.minPurchase}-${config.maxPurchase})`}
+              placeholderTextColor={colors.textSecondary}
+              keyboardType="numeric"
+            />
+            <Text style={styles.inputSuffix}>MXI</Text>
+          </View>
+
+          {error ? (
+            <View style={styles.errorBox}>
+              <IconSymbol name="exclamationmark.triangle.fill" size={20} color={colors.danger} />
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          ) : null}
+
+          {/* Quick Amount Buttons */}
+          <View style={styles.quickAmountContainer}>
+            <Text style={styles.quickAmountLabel}>Quick Select:</Text>
+            <View style={styles.quickAmountButtons}>
+              <Pressable
+                style={styles.quickAmountButton}
+                onPress={() => handleAmountChange('10')}
+              >
+                <Text style={styles.quickAmountText}>10</Text>
+              </Pressable>
+              <Pressable
+                style={styles.quickAmountButton}
+                onPress={() => handleAmountChange('50')}
+              >
+                <Text style={styles.quickAmountText}>50</Text>
+              </Pressable>
+              <Pressable
+                style={styles.quickAmountButton}
+                onPress={() => handleAmountChange('100')}
+              >
+                <Text style={styles.quickAmountText}>100</Text>
+              </Pressable>
+              <Pressable
+                style={styles.quickAmountButton}
+                onPress={() => handleAmountChange('500')}
+              >
+                <Text style={styles.quickAmountText}>500</Text>
+              </Pressable>
+              <Pressable
+                style={styles.quickAmountButton}
+                onPress={() => handleAmountChange('1000')}
+              >
+                <Text style={styles.quickAmountText}>1000</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+
+        {/* Purchase Details */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Purchase Details</Text>
 
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Amount</Text>
-            <Text style={styles.detailValue}>{purchaseAmount} MXI</Text>
+            <Text style={styles.detailValue}>{purchaseAmount.toFixed(2)} MXI</Text>
           </View>
 
           <View style={styles.detailRow}>
@@ -77,8 +171,16 @@ export default function PurchaseScreen() {
             <Text style={styles.detailLabelBold}>New Mining Power</Text>
             <Text style={styles.detailValueBold}>{newMiningPower.toFixed(2)}x</Text>
           </View>
+
+          <View style={styles.infoBox}>
+            <IconSymbol name="info.circle.fill" size={20} color={colors.primary} />
+            <Text style={styles.infoText}>
+              You gain {config.powerIncreasePercent}% mining power for every {config.powerIncreaseThreshold} MXI purchased
+            </Text>
+          </View>
         </View>
 
+        {/* Referral Bonuses */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Referral Bonuses</Text>
           <Text style={styles.cardSubtitle}>
@@ -88,9 +190,9 @@ export default function PurchaseScreen() {
           <View style={styles.bonusItem}>
             <IconSymbol name="person.fill" size={24} color={colors.primary} />
             <View style={styles.bonusInfo}>
-              <Text style={styles.bonusLabel}>Direct Referrer</Text>
+              <Text style={styles.bonusLabel}>Level 1 Referrer</Text>
               <Text style={styles.bonusValue}>
-                +{(purchaseAmount * 0.05).toFixed(4)} MXI (5%)
+                +{(purchaseAmount * (config.level1Commission / 100)).toFixed(4)} MXI ({config.level1Commission}%)
               </Text>
             </View>
           </View>
@@ -98,9 +200,19 @@ export default function PurchaseScreen() {
           <View style={styles.bonusItem}>
             <IconSymbol name="person.2.fill" size={24} color={colors.secondary} />
             <View style={styles.bonusInfo}>
-              <Text style={styles.bonusLabel}>Second-Level Referrer</Text>
+              <Text style={styles.bonusLabel}>Level 2 Referrer</Text>
               <Text style={styles.bonusValue}>
-                +{(purchaseAmount * 0.02).toFixed(4)} MXI (2%)
+                +{(purchaseAmount * (config.level2Commission / 100)).toFixed(4)} MXI ({config.level2Commission}%)
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.bonusItem}>
+            <IconSymbol name="person.3.fill" size={24} color={colors.accent} />
+            <View style={styles.bonusInfo}>
+              <Text style={styles.bonusLabel}>Level 3 Referrer</Text>
+              <Text style={styles.bonusValue}>
+                +{(purchaseAmount * (config.level3Commission / 100)).toFixed(4)} MXI ({config.level3Commission}%)
               </Text>
             </View>
           </View>
@@ -108,20 +220,20 @@ export default function PurchaseScreen() {
 
         <View style={styles.infoCard}>
           <IconSymbol name="info.circle.fill" size={24} color={colors.primary} />
-          <Text style={styles.infoText}>
+          <Text style={styles.infoCardText}>
             This is a simulated purchase. In production, this would integrate with a real payment processor.
           </Text>
         </View>
 
         <View style={styles.buttonGroup}>
           <Pressable
-            style={[styles.button, styles.primaryButton, isProcessing && styles.buttonDisabled]}
+            style={[styles.button, styles.primaryButton, (!isValidAmount || isProcessing) && styles.buttonDisabled]}
             onPress={handlePurchase}
-            disabled={isProcessing}
+            disabled={!isValidAmount || isProcessing}
           >
             <IconSymbol name="checkmark.circle.fill" size={20} color="#ffffff" />
             <Text style={styles.buttonText}>
-              {isProcessing ? 'Processing...' : `Purchase ${purchaseAmount} MXI`}
+              {isProcessing ? 'Processing...' : `Purchase ${purchaseAmount.toFixed(2)} MXI`}
             </Text>
           </Pressable>
 
@@ -168,13 +280,76 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '700',
     color: colors.text,
-    marginBottom: 16,
+    marginBottom: 8,
   },
   cardSubtitle: {
     fontSize: 14,
     color: colors.textSecondary,
     marginBottom: 16,
     lineHeight: 20,
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.background,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    gap: 12,
+    marginBottom: 12,
+  },
+  input: {
+    flex: 1,
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  inputSuffix: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.textSecondary,
+  },
+  errorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffe6e6',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+    gap: 8,
+  },
+  errorText: {
+    flex: 1,
+    fontSize: 14,
+    color: colors.danger,
+    fontWeight: '500',
+  },
+  quickAmountContainer: {
+    marginTop: 8,
+  },
+  quickAmountLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 8,
+  },
+  quickAmountButtons: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  quickAmountButton: {
+    backgroundColor: colors.background,
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderWidth: 2,
+    borderColor: colors.primary,
+  },
+  quickAmountText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.primary,
   },
   detailRow: {
     flexDirection: 'row',
@@ -228,6 +403,21 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.success,
   },
+  infoBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.highlight,
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 12,
+    gap: 10,
+  },
+  infoText: {
+    flex: 1,
+    fontSize: 13,
+    color: colors.text,
+    lineHeight: 18,
+  },
   infoCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -237,7 +427,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     gap: 12,
   },
-  infoText: {
+  infoCardText: {
     flex: 1,
     fontSize: 13,
     color: colors.text,
@@ -263,7 +453,7 @@ const styles = StyleSheet.create({
     borderColor: colors.textSecondary,
   },
   buttonDisabled: {
-    opacity: 0.6,
+    opacity: 0.5,
   },
   buttonText: {
     fontSize: 16,

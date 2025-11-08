@@ -14,10 +14,12 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import React, { useState } from "react";
 import { IconSymbol } from "@/components/IconSymbol";
 import { useAuth } from "@/contexts/AuthContext";
+import { useMiningConfig } from "@/contexts/MiningConfigContext";
 import { router } from "expo-router";
 
 export default function ProfileScreen() {
   const { user, logout } = useAuth();
+  const { config } = useMiningConfig();
   const [name, setName] = useState(user?.username || '');
   const [email, setEmail] = useState('');
   const [binanceAddress, setBinanceAddress] = useState('');
@@ -140,7 +142,7 @@ export default function ProfileScreen() {
           <View style={styles.infoBox}>
             <IconSymbol name="info.circle.fill" size={20} color={colors.primary} />
             <Text style={styles.infoText}>
-              Earn 5% from direct referrals and 2% from their referrals!
+              Earn {config.level1Commission}% from Level 1, {config.level2Commission}% from Level 2, and {config.level3Commission}% from Level 3!
             </Text>
           </View>
         </View>
@@ -204,6 +206,17 @@ export default function ProfileScreen() {
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Account Actions</Text>
           
+          <Pressable 
+            style={styles.actionButton} 
+            onPress={() => router.push('/admin')}
+          >
+            <IconSymbol name="gearshape.fill" size={24} color={colors.primary} />
+            <Text style={[styles.actionButtonText, { color: colors.primary }]}>
+              Admin Panel
+            </Text>
+            <IconSymbol name="chevron.right" size={20} color={colors.textSecondary} />
+          </Pressable>
+
           <Pressable style={styles.actionButton} onPress={handleLogout}>
             <IconSymbol name="arrow.right.square.fill" size={24} color={colors.danger} />
             <Text style={[styles.actionButtonText, { color: colors.danger }]}>

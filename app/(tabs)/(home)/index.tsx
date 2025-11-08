@@ -15,6 +15,7 @@ import { IconSymbol } from "@/components/IconSymbol";
 import { colors } from "@/styles/commonStyles";
 import { router } from "expo-router";
 import { useAuth } from "@/contexts/AuthContext";
+import { useMiningConfig } from "@/contexts/MiningConfigContext";
 import PriceChart from "@/components/PriceChart";
 import Animated, {
   useSharedValue,
@@ -27,6 +28,7 @@ import Animated, {
 export default function HomeScreen() {
   const theme = useTheme();
   const { user, updateBalance, refreshUser } = useAuth();
+  const { config } = useMiningConfig();
   const [isMining, setIsMining] = useState(false);
   const [miningProgress, setMiningProgress] = useState(0);
   const [minedAmount, setMinedAmount] = useState(0);
@@ -77,14 +79,14 @@ export default function HomeScreen() {
     };
   });
 
-  // Mining timer - 0.02 MXI per minute
+  // Mining timer - configurable MXI per minute
   useEffect(() => {
     let interval: NodeJS.Timeout;
     
     if (isMining && user) {
       interval = setInterval(() => {
-        // Update every second, mining rate is 0.02 per minute
-        const miningRate = 0.02 * user.miningPower; // MXI per minute
+        // Update every second, mining rate from config
+        const miningRate = config.miningRatePerMinute * user.miningPower; // MXI per minute
         const incrementPerSecond = miningRate / 60; // MXI per second
         
         setMinedAmount(prev => {
@@ -103,14 +105,14 @@ export default function HomeScreen() {
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [isMining, user]);
+  }, [isMining, user, config.miningRatePerMinute]);
 
   const startMining = () => {
     if (!isMining) {
       setIsMining(true);
       setMinedAmount(0);
       setMiningProgress(0);
-      console.log("Mining started - Rate: 0.02 MXI per minute");
+      console.log(`Mining started - Rate: ${config.miningRatePerMinute} MXI per minute`);
     }
   };
 
@@ -140,7 +142,7 @@ export default function HomeScreen() {
 
   const formatMiningRate = () => {
     if (!user) return "0.0000";
-    const ratePerMinute = 0.02 * user.miningPower;
+    const ratePerMinute = config.miningRatePerMinute * user.miningPower;
     return ratePerMinute.toFixed(6);
   };
 
@@ -279,7 +281,9 @@ export default function HomeScreen() {
             >
               <IconSymbol name="plus.circle.fill" size={32} color={colors.primary} />
               <Text style={styles.purchaseAmount}>10 MXI</Text>
-              <Text style={styles.purchaseBonus}>+1% Mining Power</Text>
+              <Text style={styles.purchaseBonus}>
+                +{((10 / config.powerIncreaseThreshold) * config.powerIncreasePercent).toFixed(1)}% Power
+              </Text>
             </Pressable>
 
             <Pressable 
@@ -288,7 +292,9 @@ export default function HomeScreen() {
             >
               <IconSymbol name="plus.circle.fill" size={32} color={colors.primary} />
               <Text style={styles.purchaseAmount}>50 MXI</Text>
-              <Text style={styles.purchaseBonus}>+5% Mining Power</Text>
+              <Text style={styles.purchaseBonus}>
+                +{((50 / config.powerIncreaseThreshold) * config.powerIncreasePercent).toFixed(1)}% Power
+              </Text>
             </Pressable>
 
             <Pressable 
@@ -297,9 +303,21 @@ export default function HomeScreen() {
             >
               <IconSymbol name="plus.circle.fill" size={32} color={colors.accent} />
               <Text style={styles.purchaseAmount}>100 MXI</Text>
-              <Text style={styles.purchaseBonus}>+10% Mining Power</Text>
+              <Text style={styles.purchaseBonus}>
+                +{((100 / config.powerIncreaseThreshold) * config.powerIncreasePercent).toFixed(1)}% Power
+              </Text>
             </Pressable>
           </View>
+
+          <Pressable 
+            style={[styles.button, styles.accentButton, { marginTop: 12 }]}
+            onPress={() => router.push('/purchase')}
+          >
+            <IconSymbol name="pencil.circle.fill" size={20} color={colors.text} />
+            <Text style={[styles.buttonText, { color: colors.text }]}>
+              Custom Amount ({config.minPurchase}-{config.maxPurchase} MXI)
+            </Text>
+          </Pressable>
         </View>
 
         {/* Referral Card */}
@@ -329,7 +347,7 @@ export default function HomeScreen() {
           <View style={styles.infoBox}>
             <IconSymbol name="info.circle.fill" size={20} color={colors.primary} />
             <Text style={styles.infoBoxText}>
-              Earn 5% from Level 1, 2% from Level 2, and 1% from Level 3 referrals!
+              Earn {config.level1Commission}% from Level 1, {config.level2Commission}% from Level 2, and {config.level3Commission}% from Level 3 referrals!
             </Text>
           </View>
         </View>
@@ -376,7 +394,7 @@ export default function HomeScreen() {
         <View style={[styles.card, styles.infoCard]}>
           <IconSymbol name="info.circle.fill" size={24} color={colors.primary} />
           <Text style={styles.infoCardText}>
-            Keep the app open to mine Maxcoin MXI at 0.02 MXI per minute. Your mining power increases with purchases!
+            Keep the app open to mine Maxcoin MXI at {config.miningRatePerMinute} MXI per minute. Your mining power increases with purchases!
           </Text>
         </View>
       </ScrollView>
