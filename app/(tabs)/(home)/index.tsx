@@ -14,6 +14,7 @@ import {
 import { IconSymbol } from "@/components/IconSymbol";
 import { colors } from "@/styles/commonStyles";
 import { router } from "expo-router";
+import { useAuth } from "@/contexts/AuthContext";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -24,16 +25,22 @@ import Animated, {
 
 export default function HomeScreen() {
   const theme = useTheme();
-  const [minedAmount, setMinedAmount] = useState(0);
+  const { user, updateBalance, refreshUser } = useAuth();
   const [isMining, setIsMining] = useState(false);
   const [miningProgress, setMiningProgress] = useState(0);
   const [timeRemaining, setTimeRemaining] = useState(7200); // 2 hours in seconds
-  const [level, setLevel] = useState(1);
   const [binanceConnected, setBinanceConnected] = useState(false);
 
   // Animation values
   const rotation = useSharedValue(0);
   const scale = useSharedValue(1);
+
+  // Redirect if not logged in
+  useEffect(() => {
+    if (!user) {
+      router.replace('/(auth)/login');
+    }
+  }, [user]);
 
   // Start rotation animation when mining
   useEffect(() => {
@@ -82,13 +89,14 @@ export default function HomeScreen() {
           
           // Complete mining cycle
           if (newTime <= 0) {
-            setMinedAmount((prev) => prev + 0.1);
+            const miningReward = 0.1 * (user?.miningPower || 1);
+            updateBalance(miningReward);
             setIsMining(false);
             setTimeRemaining(7200);
             setMiningProgress(0);
             Alert.alert(
               "Mining Complete!",
-              "You have mined 0.1 MXI! Start mining again to earn more.",
+              `You have mined ${miningReward.toFixed(4)} MXI! Start mining again to earn more.`,
               [{ text: "OK" }]
             );
             return 7200;
@@ -102,7 +110,7 @@ export default function HomeScreen() {
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [isMining, timeRemaining]);
+  }, [isMining, timeRemaining, user]);
 
   const startMining = () => {
     if (!isMining) {
@@ -141,6 +149,10 @@ export default function HomeScreen() {
     </Pressable>
   );
 
+  if (!user) {
+    return null;
+  }
+
   return (
     <>
       {Platform.OS === 'ios' && (
@@ -171,11 +183,80 @@ export default function HomeScreen() {
           </View>
           
           <Text style={styles.balanceLabel}>Your Balance</Text>
-          <Text style={styles.balanceAmount}>{minedAmount.toFixed(4)} MXI</Text>
+          <Text style={styles.balanceAmount}>{user.balance.toFixed(4)} MXI</Text>
           
           <View style={styles.levelBadge}>
             <IconSymbol name="star.fill" size={16} color={colors.accent} />
-            <Text style={styles.levelText}>Level {level}</Text>
+            <Text style={styles.levelText}>Mining Power: {user.miningPower.toFixed(2)}x</Text>
+          </View>
+        </View>
+
+        {/* Purchase Card */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Purchase Maxcoin</Text>
+          <Text style={styles.cardSubtitle}>
+            Increase your mining power by purchasing MXI
+          </Text>
+          
+          <View style={styles.purchaseGrid}>
+            <Pressable 
+              style={styles.purchaseButton}
+              onPress={() => router.push('/purchase?amount=10')}
+            >
+              <IconSymbol name="plus.circle.fill" size={32} color={colors.primary} />
+              <Text style={styles.purchaseAmount}>10 MXI</Text>
+              <Text style={styles.purchaseBonus}>+1% Mining Power</Text>
+            </Pressable>
+
+            <Pressable 
+              style={styles.purchaseButton}
+              onPress={() => router.push('/purchase?amount=50')}
+            >
+              <IconSymbol name="plus.circle.fill" size={32} color={colors.primary} />
+              <Text style={styles.purchaseAmount}>50 MXI</Text>
+              <Text style={styles.purchaseBonus}>+5% Mining Power</Text>
+            </Pressable>
+
+            <Pressable 
+              style={styles.purchaseButton}
+              onPress={() => router.push('/purchase?amount=100')}
+            >
+              <IconSymbol name="plus.circle.fill" size={32} color={colors.accent} />
+              <Text style={styles.purchaseAmount}>100 MXI</Text>
+              <Text style={styles.purchaseBonus}>+10% Mining Power</Text>
+            </Pressable>
+          </View>
+        </View>
+
+        {/* Referral Card */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Referral Program</Text>
+          
+          <View style={styles.referralCodeBox}>
+            <Text style={styles.referralLabel}>Your Referral Code</Text>
+            <Text style={styles.referralCode}>{user.referralCode}</Text>
+            <Text style={styles.referralHint}>Share this code to earn rewards!</Text>
+          </View>
+
+          <View style={styles.referralStats}>
+            <View style={styles.referralStatItem}>
+              <IconSymbol name="person.2.fill" size={24} color={colors.primary} />
+              <Text style={styles.referralStatValue}>{user.referrals.length}</Text>
+              <Text style={styles.referralStatLabel}>Referrals</Text>
+            </View>
+
+            <View style={styles.referralStatItem}>
+              <IconSymbol name="dollarsign.circle.fill" size={24} color={colors.success} />
+              <Text style={styles.referralStatValue}>{user.referralEarnings.toFixed(4)}</Text>
+              <Text style={styles.referralStatLabel}>Earned (MXI)</Text>
+            </View>
+          </View>
+
+          <View style={styles.infoBox}>
+            <IconSymbol name="info.circle.fill" size={20} color={colors.primary} />
+            <Text style={styles.infoBoxText}>
+              Earn 5% from direct referrals and 2% from their referrals!
+            </Text>
           </View>
         </View>
 
@@ -203,7 +284,7 @@ export default function HomeScreen() {
             <View style={styles.infoRow}>
               <IconSymbol name="chart.bar.fill" size={20} color={colors.textSecondary} />
               <Text style={styles.infoText}>
-                Rate: 0.1 MXI / 2 hours
+                Rate: {(0.1 * user.miningPower).toFixed(4)} MXI / 2 hours
               </Text>
             </View>
           </View>
@@ -268,36 +349,11 @@ export default function HomeScreen() {
           )}
         </View>
 
-        {/* Stats Card */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Mining Statistics</Text>
-          
-          <View style={styles.statsGrid}>
-            <View style={styles.statItem}>
-              <IconSymbol name="chart.line.uptrend.xyaxis" size={24} color={colors.primary} />
-              <Text style={styles.statValue}>{minedAmount.toFixed(4)}</Text>
-              <Text style={styles.statLabel}>Total Mined</Text>
-            </View>
-            
-            <View style={styles.statItem}>
-              <IconSymbol name="flame.fill" size={24} color={colors.accent} />
-              <Text style={styles.statValue}>{level}</Text>
-              <Text style={styles.statLabel}>Mining Level</Text>
-            </View>
-            
-            <View style={styles.statItem}>
-              <IconSymbol name="bolt.fill" size={24} color={colors.success} />
-              <Text style={styles.statValue}>0.1</Text>
-              <Text style={styles.statLabel}>MXI/2h Rate</Text>
-            </View>
-          </View>
-        </View>
-
         {/* Info Card */}
         <View style={[styles.card, styles.infoCard]}>
           <IconSymbol name="info.circle.fill" size={24} color={colors.primary} />
           <Text style={styles.infoCardText}>
-            Keep the app open to mine Maxcoin MXI. You earn 0.1 MXI every 2 hours of active mining.
+            Keep the app open to mine Maxcoin MXI. Your mining power increases with purchases!
           </Text>
         </View>
       </ScrollView>
@@ -332,6 +388,11 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '700',
     color: colors.text,
+    marginBottom: 8,
+  },
+  cardSubtitle: {
+    fontSize: 14,
+    color: colors.textSecondary,
     marginBottom: 16,
   },
   balanceLabel: {
@@ -362,6 +423,89 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: colors.text,
+  },
+  purchaseGrid: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 8,
+  },
+  purchaseButton: {
+    flex: 1,
+    backgroundColor: colors.background,
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    gap: 8,
+  },
+  purchaseAmount: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  purchaseBonus: {
+    fontSize: 12,
+    color: colors.success,
+    fontWeight: '600',
+  },
+  referralCodeBox: {
+    backgroundColor: colors.background,
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  referralLabel: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginBottom: 4,
+  },
+  referralCode: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: colors.primary,
+    letterSpacing: 2,
+  },
+  referralHint: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginTop: 4,
+  },
+  referralStats: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 16,
+  },
+  referralStatItem: {
+    flex: 1,
+    backgroundColor: colors.background,
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    gap: 8,
+  },
+  referralStatValue: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  referralStatLabel: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    textAlign: 'center',
+  },
+  infoBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.highlight,
+    borderRadius: 8,
+    padding: 12,
+    gap: 10,
+  },
+  infoBoxText: {
+    flex: 1,
+    fontSize: 13,
+    color: colors.text,
+    lineHeight: 18,
   },
   progressBarContainer: {
     height: 12,
@@ -431,29 +575,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '500',
     color: colors.text,
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    gap: 12,
-  },
-  statItem: {
-    flex: 1,
-    alignItems: 'center',
-    padding: 12,
-    backgroundColor: colors.background,
-    borderRadius: 12,
-    gap: 8,
-  },
-  statValue: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: colors.text,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    textAlign: 'center',
   },
   infoCard: {
     flexDirection: 'row',
