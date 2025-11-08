@@ -66,7 +66,7 @@ export default function HomeScreen() {
       rotation.value = withTiming(0);
       scale.value = withTiming(1);
     }
-  }, [isMining]);
+  }, [isMining, rotation, scale]);
 
   const animatedStyle = useAnimatedStyle(() => {
     return {
