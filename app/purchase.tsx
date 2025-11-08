@@ -14,12 +14,13 @@ import { useAuth } from '@/contexts/AuthContext';
 import { colors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useMiningConfig } from '@/contexts/MiningConfigContext';
+import { useLocalization } from '@/contexts/LocalizationContext';
 
 export default function PurchaseScreen() {
   const { amount: paramAmount } = useLocalSearchParams<{ amount: string }>();
-  const { purchaseMaxcoin, user } = useAuth();
+  const { user } = useAuth();
   const { config } = useMiningConfig();
-  const [isProcessing, setIsProcessing] = useState(false);
+  const { t } = useLocalization();
   const [customAmount, setCustomAmount] = useState(paramAmount || '10');
   const [error, setError] = useState('');
 
@@ -35,40 +36,27 @@ export default function PurchaseScreen() {
     const amount = parseFloat(text);
     
     if (isNaN(amount)) {
-      setError('Please enter a valid number');
+      setError(t('purchase.invalidAmountMessage', { min: config.minPurchase, max: config.maxPurchase }));
     } else if (amount < config.minPurchase) {
-      setError(`Minimum purchase is ${config.minPurchase} MXI`);
+      setError(t('purchase.minimumPurchaseError', { min: config.minPurchase }));
     } else if (amount > config.maxPurchase) {
-      setError(`Maximum purchase is ${config.maxPurchase} MXI per transaction`);
+      setError(t('purchase.maximumPurchaseError', { max: config.maxPurchase }));
     } else {
       setError('');
     }
   };
 
-  const handlePurchase = async () => {
+  const handleProceedToPayment = () => {
     if (!isValidAmount) {
-      Alert.alert('Invalid Amount', error || 'Please enter a valid amount');
+      Alert.alert(t('purchase.invalidAmount'), error || t('purchase.invalidAmountMessage', { min: config.minPurchase, max: config.maxPurchase }));
       return;
     }
 
-    setIsProcessing(true);
-
-    // Simulate payment processing
-    setTimeout(async () => {
-      await purchaseMaxcoin(purchaseAmount);
-      setIsProcessing(false);
-
-      Alert.alert(
-        'Purchase Successful!',
-        `You have purchased ${purchaseAmount} MXI!\n\nYour mining power has increased to ${newMiningPower.toFixed(2)}x`,
-        [
-          {
-            text: 'OK',
-            onPress: () => router.back(),
-          },
-        ]
-      );
-    }, 1500);
+    // Navigate to payment methods screen
+    router.push({
+      pathname: '/payment-methods',
+      params: { amount: purchaseAmount.toString() },
+    });
   };
 
   return (
@@ -76,14 +64,14 @@ export default function PurchaseScreen() {
       <View style={styles.content}>
         <View style={styles.header}>
           <IconSymbol name="cart.fill" size={80} color={colors.primary} />
-          <Text style={styles.title}>Purchase Maxcoin</Text>
+          <Text style={styles.title}>{t('purchase.title')}</Text>
         </View>
 
         {/* Custom Amount Input */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Enter Amount</Text>
+          <Text style={styles.cardTitle}>{t('purchase.enterAmount')}</Text>
           <Text style={styles.cardSubtitle}>
-            Min: {config.minPurchase} MXI | Max: {config.maxPurchase} MXI per transaction
+            {t('purchase.minMaxInfo', { min: config.minPurchase, max: config.maxPurchase })}
           </Text>
 
           <View style={styles.inputContainer}>
@@ -92,7 +80,7 @@ export default function PurchaseScreen() {
               style={styles.input}
               value={customAmount}
               onChangeText={handleAmountChange}
-              placeholder={`Enter amount (${config.minPurchase}-${config.maxPurchase})`}
+              placeholder={t('purchase.enterAmountPlaceholder', { min: config.minPurchase, max: config.maxPurchase })}
               placeholderTextColor={colors.textSecondary}
               keyboardType="numeric"
             />
@@ -108,7 +96,7 @@ export default function PurchaseScreen() {
 
           {/* Quick Amount Buttons */}
           <View style={styles.quickAmountContainer}>
-            <Text style={styles.quickAmountLabel}>Quick Select:</Text>
+            <Text style={styles.quickAmountLabel}>{t('purchase.quickSelect')}</Text>
             <View style={styles.quickAmountButtons}>
               <Pressable
                 style={styles.quickAmountButton}
@@ -146,20 +134,20 @@ export default function PurchaseScreen() {
 
         {/* Purchase Details */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Purchase Details</Text>
+          <Text style={styles.cardTitle}>{t('purchase.purchaseDetails')}</Text>
 
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Amount</Text>
+            <Text style={styles.detailLabel}>{t('purchase.amount')}</Text>
             <Text style={styles.detailValue}>{purchaseAmount.toFixed(2)} MXI</Text>
           </View>
 
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Current Mining Power</Text>
+            <Text style={styles.detailLabel}>{t('purchase.currentPower')}</Text>
             <Text style={styles.detailValue}>{(user?.miningPower || 1).toFixed(2)}x</Text>
           </View>
 
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Mining Power Increase</Text>
+            <Text style={styles.detailLabel}>{t('purchase.powerIncrease')}</Text>
             <Text style={[styles.detailValue, { color: colors.success }]}>
               +{miningPowerIncrease.toFixed(2)}x
             </Text>
@@ -168,29 +156,29 @@ export default function PurchaseScreen() {
           <View style={styles.divider} />
 
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabelBold}>New Mining Power</Text>
+            <Text style={styles.detailLabelBold}>{t('purchase.newPower')}</Text>
             <Text style={styles.detailValueBold}>{newMiningPower.toFixed(2)}x</Text>
           </View>
 
           <View style={styles.infoBox}>
             <IconSymbol name="info.circle.fill" size={20} color={colors.primary} />
             <Text style={styles.infoText}>
-              You gain {config.powerIncreasePercent}% mining power for every {config.powerIncreaseThreshold} MXI purchased
+              {t('purchase.powerIncreaseInfo', { percent: config.powerIncreasePercent, threshold: config.powerIncreaseThreshold })}
             </Text>
           </View>
         </View>
 
         {/* Referral Bonuses */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Referral Bonuses</Text>
+          <Text style={styles.cardTitle}>{t('purchase.referralBonuses')}</Text>
           <Text style={styles.cardSubtitle}>
-            Your referrers will receive bonuses from this purchase:
+            {t('purchase.referralBonusesInfo')}
           </Text>
 
           <View style={styles.bonusItem}>
             <IconSymbol name="person.fill" size={24} color={colors.primary} />
             <View style={styles.bonusInfo}>
-              <Text style={styles.bonusLabel}>Level 1 Referrer</Text>
+              <Text style={styles.bonusLabel}>{t('purchase.level1Referrer')}</Text>
               <Text style={styles.bonusValue}>
                 +{(purchaseAmount * (config.level1Commission / 100)).toFixed(4)} MXI ({config.level1Commission}%)
               </Text>
@@ -200,7 +188,7 @@ export default function PurchaseScreen() {
           <View style={styles.bonusItem}>
             <IconSymbol name="person.2.fill" size={24} color={colors.secondary} />
             <View style={styles.bonusInfo}>
-              <Text style={styles.bonusLabel}>Level 2 Referrer</Text>
+              <Text style={styles.bonusLabel}>{t('purchase.level2Referrer')}</Text>
               <Text style={styles.bonusValue}>
                 +{(purchaseAmount * (config.level2Commission / 100)).toFixed(4)} MXI ({config.level2Commission}%)
               </Text>
@@ -210,7 +198,7 @@ export default function PurchaseScreen() {
           <View style={styles.bonusItem}>
             <IconSymbol name="person.3.fill" size={24} color={colors.accent} />
             <View style={styles.bonusInfo}>
-              <Text style={styles.bonusLabel}>Level 3 Referrer</Text>
+              <Text style={styles.bonusLabel}>{t('purchase.level3Referrer')}</Text>
               <Text style={styles.bonusValue}>
                 +{(purchaseAmount * (config.level3Commission / 100)).toFixed(4)} MXI ({config.level3Commission}%)
               </Text>
@@ -218,31 +206,33 @@ export default function PurchaseScreen() {
           </View>
         </View>
 
-        <View style={styles.infoCard}>
-          <IconSymbol name="info.circle.fill" size={24} color={colors.primary} />
-          <Text style={styles.infoCardText}>
-            This is a simulated purchase. In production, this would integrate with a real payment processor.
-          </Text>
+        <View style={styles.paymentMethodsCard}>
+          <IconSymbol name="creditcard.fill" size={24} color={colors.primary} />
+          <View style={styles.paymentMethodsInfo}>
+            <Text style={styles.paymentMethodsTitle}>{t('purchase.multiplePaymentMethods')}</Text>
+            <Text style={styles.paymentMethodsText}>
+              {t('purchase.paymentMethodsDescription')}
+            </Text>
+          </View>
         </View>
 
         <View style={styles.buttonGroup}>
           <Pressable
-            style={[styles.button, styles.primaryButton, (!isValidAmount || isProcessing) && styles.buttonDisabled]}
-            onPress={handlePurchase}
-            disabled={!isValidAmount || isProcessing}
+            style={[styles.button, styles.primaryButton, !isValidAmount && styles.buttonDisabled]}
+            onPress={handleProceedToPayment}
+            disabled={!isValidAmount}
           >
-            <IconSymbol name="checkmark.circle.fill" size={20} color="#ffffff" />
+            <IconSymbol name="arrow.right.circle.fill" size={20} color="#ffffff" />
             <Text style={styles.buttonText}>
-              {isProcessing ? 'Processing...' : `Purchase ${purchaseAmount.toFixed(2)} MXI`}
+              {t('purchase.proceedToPayment')}
             </Text>
           </Pressable>
 
           <Pressable
             style={[styles.button, styles.secondaryButton]}
             onPress={() => router.back()}
-            disabled={isProcessing}
           >
-            <Text style={[styles.buttonText, { color: colors.text }]}>Cancel</Text>
+            <Text style={[styles.buttonText, { color: colors.text }]}>{t('common.cancel')}</Text>
           </Pressable>
         </View>
       </View>
@@ -418,7 +408,7 @@ const styles = StyleSheet.create({
     color: colors.text,
     lineHeight: 18,
   },
-  infoCard: {
+  paymentMethodsCard: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.highlight,
@@ -427,10 +417,18 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     gap: 12,
   },
-  infoCardText: {
+  paymentMethodsInfo: {
     flex: 1,
-    fontSize: 13,
+  },
+  paymentMethodsTitle: {
+    fontSize: 16,
+    fontWeight: '700',
     color: colors.text,
+    marginBottom: 4,
+  },
+  paymentMethodsText: {
+    fontSize: 13,
+    color: colors.textSecondary,
     lineHeight: 18,
   },
   buttonGroup: {
