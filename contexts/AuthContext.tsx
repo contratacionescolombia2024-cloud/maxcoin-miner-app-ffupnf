@@ -15,11 +15,24 @@ export interface Transaction {
   description?: string;
   timestamp: string;
   status: 'pending' | 'completed' | 'failed';
+  platform?: string;
+}
+
+export interface WithdrawalRestrictions {
+  purchasedAmount: number; // Amount purchased or transferred from external wallet
+  miningEarnings: number; // Earnings from mining
+  commissionEarnings: number; // Earnings from commissions
+  lastWithdrawalDate?: string;
+  withdrawalCount: number;
+  canWithdrawEarnings: boolean;
+  earningsWithdrawalCycleStart?: string;
 }
 
 export interface User {
   id: string;
   username: string;
+  email: string;
+  emailVerified: boolean;
   balance: number;
   miningPower: number;
   referralCode: string;
@@ -35,15 +48,17 @@ export interface User {
     skrill?: string;
   };
   transactions: Transaction[];
+  withdrawalRestrictions: WithdrawalRestrictions;
+  isBlocked?: boolean;
 }
 
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
-  login: (username: string, password: string) => Promise<boolean>;
-  register: (username: string, password: string, referralCode?: string) => Promise<boolean>;
+  login: (email: string, password: string) => Promise<{ success: boolean; message?: string }>;
+  register: (username: string, email: string, password: string, referralCode?: string) => Promise<{ success: boolean; message?: string }>;
   logout: () => Promise<void>;
-  updateBalance: (amount: number) => Promise<void>;
+  updateBalance: (amount: number, type: 'mining' | 'commission' | 'purchase') => Promise<void>;
   purchaseMaxcoin: (amount: number) => Promise<void>;
   addReferralEarnings: (amount: number) => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -52,6 +67,7 @@ interface AuthContextType {
   updateWithdrawalAddress: (platform: string, address: string) => Promise<void>;
   getUserByReferralCode: (code: string) => Promise<User | null>;
   getTransactionHistory: () => Transaction[];
+  canWithdrawAmount: (amount: number) => { canWithdraw: boolean; availableForWithdrawal: number; message?: string };
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -119,13 +135,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const register = async (username: string, password: string, referralCode?: string): Promise<boolean> => {
+  const register = async (
+    username: string,
+    email: string,
+    password: string,
+    referralCode?: string
+  ): Promise<{ success: boolean; message?: string }> => {
     try {
       const usersData = await AsyncStorage.getItem(STORAGE_KEYS.USERS);
       const users: User[] = usersData ? JSON.parse(usersData) : [];
 
+      // Check for duplicate username
       if (users.some(u => u.username.toLowerCase() === username.toLowerCase())) {
-        return false;
+        return { success: false, message: 'Username already exists' };
+      }
+
+      // Check for duplicate email
+      if (users.some(u => u.email.toLowerCase() === email.toLowerCase())) {
+        return { success: false, message: 'Email already registered' };
       }
 
       let referredByUserId: string | undefined;
@@ -139,6 +166,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const newUser: User = {
         id: Date.now().toString(),
         username,
+        email: email.toLowerCase(),
+        emailVerified: true, // Simulated email verification
         balance: 0,
         miningPower: 1,
         referralCode: generateReferralCode(username),
@@ -150,6 +179,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         uniqueIdentifier: generateUniqueIdentifier(username),
         withdrawalAddresses: {},
         transactions: [],
+        withdrawalRestrictions: {
+          purchasedAmount: 0,
+          miningEarnings: 0,
+          commissionEarnings: 0,
+          withdrawalCount: 0,
+          canWithdrawEarnings: false,
+        },
+        isBlocked: false,
       };
 
       if (referredByUserId) {
@@ -169,34 +206,49 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       await AsyncStorage.setItem(STORAGE_KEYS.CURRENT_USER, newUser.id);
 
       setUser(newUser);
-      return true;
+      console.log('User registered:', { username, email, emailVerified: true });
+      return { success: true };
     } catch (error) {
       console.error('Error registering user:', error);
-      return false;
+      return { success: false, message: 'Registration failed' };
     }
   };
 
-  const login = async (username: string, password: string): Promise<boolean> => {
+  const login = async (email: string, password: string): Promise<{ success: boolean; message?: string }> => {
     try {
       const usersData = await AsyncStorage.getItem(STORAGE_KEYS.USERS);
-      if (!usersData) return false;
+      if (!usersData) return { success: false, message: 'No users found' };
 
       const users: User[] = JSON.parse(usersData);
-      const foundUser = users.find(u => u.username.toLowerCase() === username.toLowerCase());
+      const foundUser = users.find(u => u.email.toLowerCase() === email.toLowerCase());
 
-      if (!foundUser) return false;
+      if (!foundUser) return { success: false, message: 'User not found' };
+
+      // Check if user is blocked
+      const blockedUsersData = await AsyncStorage.getItem('@maxcoin_blocked_users');
+      const blockedUsers = blockedUsersData ? JSON.parse(blockedUsersData) : [];
+      if (blockedUsers.includes(foundUser.id)) {
+        return { success: false, message: 'Account has been blocked. Please contact support.' };
+      }
 
       const passwordsData = await AsyncStorage.getItem('@maxcoin_passwords');
       const passwords = passwordsData ? JSON.parse(passwordsData) : {};
       
-      if (passwords[foundUser.id] !== password) return false;
+      if (passwords[foundUser.id] !== password) {
+        return { success: false, message: 'Invalid password' };
+      }
+
+      if (!foundUser.emailVerified) {
+        return { success: false, message: 'Please verify your email before logging in' };
+      }
 
       await AsyncStorage.setItem(STORAGE_KEYS.CURRENT_USER, foundUser.id);
       setUser(foundUser);
-      return true;
+      console.log('User logged in:', { email, username: foundUser.username });
+      return { success: true };
     } catch (error) {
       console.error('Error logging in:', error);
-      return false;
+      return { success: false, message: 'Login failed' };
     }
   };
 
@@ -209,7 +261,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const updateBalance = async (amount: number) => {
+  const updateBalance = async (amount: number, type: 'mining' | 'commission' | 'purchase') => {
     if (!user) return;
 
     try {
@@ -221,6 +273,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       if (userIndex !== -1) {
         users[userIndex].balance += amount;
+        
+        // Track earnings by type for withdrawal restrictions
+        if (type === 'mining') {
+          users[userIndex].withdrawalRestrictions.miningEarnings += amount;
+        } else if (type === 'commission') {
+          users[userIndex].withdrawalRestrictions.commissionEarnings += amount;
+        } else if (type === 'purchase') {
+          users[userIndex].withdrawalRestrictions.purchasedAmount += amount;
+        }
+
+        // Add transaction
+        const transaction: Transaction = {
+          id: `${type.toUpperCase()}-${Date.now()}-${Math.random().toString(36).substring(2, 9).toUpperCase()}`,
+          type: type === 'purchase' ? 'purchase' : type === 'commission' ? 'commission' : 'mining',
+          amount: amount,
+          description: `${type.charAt(0).toUpperCase() + type.slice(1)} earnings`,
+          timestamp: new Date().toISOString(),
+          status: 'completed',
+        };
+
+        if (!users[userIndex].transactions) {
+          users[userIndex].transactions = [];
+        }
+        users[userIndex].transactions.unshift(transaction);
+
         await AsyncStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
         setUser(users[userIndex]);
       }
@@ -229,23 +306,199 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const addTransaction = async (userId: string, transaction: Transaction) => {
+  const canWithdrawAmount = (amount: number): { canWithdraw: boolean; availableForWithdrawal: number; message?: string } => {
+    if (!user) {
+      return { canWithdraw: false, availableForWithdrawal: 0, message: 'User not authenticated' };
+    }
+
+    const restrictions = user.withdrawalRestrictions;
+    const availablePurchased = restrictions.purchasedAmount;
+    
+    // Check if user can withdraw earnings
+    const canWithdrawEarnings = checkEarningsWithdrawalEligibility(user);
+    const availableEarnings = canWithdrawEarnings ? 
+      (restrictions.miningEarnings + restrictions.commissionEarnings) : 0;
+    
+    const totalAvailable = availablePurchased + availableEarnings;
+
+    if (amount > totalAvailable) {
+      return {
+        canWithdraw: false,
+        availableForWithdrawal: totalAvailable,
+        message: `You can only withdraw ${totalAvailable.toFixed(6)} MXI. ` +
+                 `(${availablePurchased.toFixed(6)} from purchases, ` +
+                 `${availableEarnings.toFixed(6)} from earnings)`
+      };
+    }
+
+    return { canWithdraw: true, availableForWithdrawal: totalAvailable };
+  };
+
+  const checkEarningsWithdrawalEligibility = (user: User): boolean => {
+    const restrictions = user.withdrawalRestrictions;
+    
+    // Get active referrals (those who have made purchases or transfers)
+    const activeReferrals = user.referrals.filter(refId => {
+      // This would need to check actual referral data
+      return true; // Simplified for now
+    });
+
+    // First withdrawal requirements: 5 active referrals + 10 days
+    if (restrictions.withdrawalCount === 0) {
+      if (activeReferrals.length < 5) {
+        return false;
+      }
+      
+      if (restrictions.earningsWithdrawalCycleStart) {
+        const cycleStart = new Date(restrictions.earningsWithdrawalCycleStart);
+        const daysSinceCycleStart = (Date.now() - cycleStart.getTime()) / (1000 * 60 * 60 * 24);
+        if (daysSinceCycleStart < 10) {
+          return false;
+        }
+      }
+    }
+    
+    // After second withdrawal: at least 1 active referral per cycle
+    if (restrictions.withdrawalCount >= 2) {
+      if (activeReferrals.length < 1) {
+        return false;
+      }
+      
+      if (restrictions.lastWithdrawalDate) {
+        const lastWithdrawal = new Date(restrictions.lastWithdrawalDate);
+        const daysSinceLastWithdrawal = (Date.now() - lastWithdrawal.getTime()) / (1000 * 60 * 60 * 24);
+        if (daysSinceLastWithdrawal < 10) {
+          return false;
+        }
+      }
+    }
+
+    return true;
+  };
+
+  const withdrawMXI = async (
+    platform: string,
+    address: string,
+    amount: number
+  ): Promise<{ success: boolean; message?: string }> => {
+    if (!user) {
+      return { success: false, message: 'User not authenticated' };
+    }
+
+    try {
+      // Check withdrawal eligibility
+      const eligibility = canWithdrawAmount(amount);
+      if (!eligibility.canWithdraw) {
+        return { success: false, message: eligibility.message };
+      }
+
+      const usersData = await AsyncStorage.getItem(STORAGE_KEYS.USERS);
+      if (!usersData) {
+        return { success: false, message: 'Failed to load users data' };
+      }
+
+      const users: User[] = JSON.parse(usersData);
+      const userIndex = users.findIndex(u => u.id === user.id);
+
+      if (userIndex === -1) {
+        return { success: false, message: 'User not found' };
+      }
+
+      if (users[userIndex].balance < amount) {
+        return { success: false, message: 'Insufficient balance' };
+      }
+
+      // Deduct from balance
+      users[userIndex].balance -= amount;
+
+      // Deduct from appropriate restriction categories
+      let remainingAmount = amount;
+      const restrictions = users[userIndex].withdrawalRestrictions;
+
+      // First deduct from purchased amount
+      if (restrictions.purchasedAmount > 0) {
+        const deductFromPurchased = Math.min(remainingAmount, restrictions.purchasedAmount);
+        restrictions.purchasedAmount -= deductFromPurchased;
+        remainingAmount -= deductFromPurchased;
+      }
+
+      // Then deduct from earnings if eligible
+      if (remainingAmount > 0 && checkEarningsWithdrawalEligibility(users[userIndex])) {
+        if (restrictions.miningEarnings > 0) {
+          const deductFromMining = Math.min(remainingAmount, restrictions.miningEarnings);
+          restrictions.miningEarnings -= deductFromMining;
+          remainingAmount -= deductFromMining;
+        }
+        
+        if (remainingAmount > 0 && restrictions.commissionEarnings > 0) {
+          const deductFromCommission = Math.min(remainingAmount, restrictions.commissionEarnings);
+          restrictions.commissionEarnings -= deductFromCommission;
+          remainingAmount -= deductFromCommission;
+        }
+      }
+
+      // Update withdrawal tracking
+      restrictions.withdrawalCount += 1;
+      restrictions.lastWithdrawalDate = new Date().toISOString();
+      if (!restrictions.earningsWithdrawalCycleStart) {
+        restrictions.earningsWithdrawalCycleStart = new Date().toISOString();
+      }
+
+      const withdrawalTransaction: Transaction = {
+        id: `WTH-${Date.now()}-${Math.random().toString(36).substring(2, 9).toUpperCase()}`,
+        type: 'withdrawal',
+        amount: -amount,
+        to: address,
+        platform: platform,
+        description: `Withdrawal to ${platform} (Processed within 48 hours)`,
+        timestamp: new Date().toISOString(),
+        status: 'pending',
+      };
+
+      if (!users[userIndex].transactions) users[userIndex].transactions = [];
+      users[userIndex].transactions.unshift(withdrawalTransaction);
+
+      await AsyncStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+      setUser(users[userIndex]);
+
+      console.log('Withdrawal initiated:', {
+        transactionId: withdrawalTransaction.id,
+        user: user.username,
+        uniqueId: user.uniqueIdentifier,
+        platform,
+        address,
+        amount,
+        withdrawalCount: restrictions.withdrawalCount,
+        timestamp: new Date().toISOString(),
+      });
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error withdrawing MXI:', error);
+      return { success: false, message: 'Withdrawal failed' };
+    }
+  };
+
+  const updateWithdrawalAddress = async (platform: string, address: string) => {
+    if (!user) return;
+
     try {
       const usersData = await AsyncStorage.getItem(STORAGE_KEYS.USERS);
       if (!usersData) return;
 
       const users: User[] = JSON.parse(usersData);
-      const userIndex = users.findIndex(u => u.id === userId);
+      const userIndex = users.findIndex(u => u.id === user.id);
 
       if (userIndex !== -1) {
-        if (!users[userIndex].transactions) {
-          users[userIndex].transactions = [];
+        if (!users[userIndex].withdrawalAddresses) {
+          users[userIndex].withdrawalAddresses = {};
         }
-        users[userIndex].transactions.unshift(transaction);
+        users[userIndex].withdrawalAddresses[platform.toLowerCase()] = address;
         await AsyncStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+        setUser(users[userIndex]);
       }
     } catch (error) {
-      console.error('Error adding transaction:', error);
+      console.error('Error updating withdrawal address:', error);
     }
   };
 
@@ -308,6 +561,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       const recipientIndex = users.findIndex(u => u.id === recipient.id);
       users[recipientIndex].balance += recipientReceives;
+      
+      // Track as purchased amount for recipient (can be withdrawn)
+      users[recipientIndex].withdrawalRestrictions.purchasedAmount += recipientReceives;
 
       const transactionId = `TXN-${Date.now()}-${Math.random().toString(36).substring(2, 9).toUpperCase()}`;
       
@@ -345,12 +601,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       users[senderIndex].transactions.unshift(senderTransaction);
       users[recipientIndex].transactions.unshift(recipientTransaction);
 
+      // Distribute commissions
       if (users[senderIndex].referredBy) {
         const level1Index = users.findIndex(u => u.id === users[senderIndex].referredBy);
         if (level1Index !== -1) {
           const level1Commission = commissionAmount * 0.5;
           users[level1Index].balance += level1Commission;
           users[level1Index].referralEarnings += level1Commission;
+          users[level1Index].withdrawalRestrictions.commissionEarnings += level1Commission;
 
           const commissionTransaction: Transaction = {
             id: `COM-${Date.now()}-${Math.random().toString(36).substring(2, 9).toUpperCase()}`,
@@ -365,14 +623,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           if (!users[level1Index].transactions) users[level1Index].transactions = [];
           users[level1Index].transactions.unshift(commissionTransaction);
 
-          console.log(`Level 1 commission: ${level1Commission} MXI to ${users[level1Index].username}`);
-
           if (users[level1Index].referredBy) {
             const level2Index = users.findIndex(u => u.id === users[level1Index].referredBy);
             if (level2Index !== -1) {
               const level2Commission = commissionAmount * 0.3;
               users[level2Index].balance += level2Commission;
               users[level2Index].referralEarnings += level2Commission;
+              users[level2Index].withdrawalRestrictions.commissionEarnings += level2Commission;
 
               const level2CommissionTransaction: Transaction = {
                 id: `COM-${Date.now()}-${Math.random().toString(36).substring(2, 9).toUpperCase()}`,
@@ -387,14 +644,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               if (!users[level2Index].transactions) users[level2Index].transactions = [];
               users[level2Index].transactions.unshift(level2CommissionTransaction);
 
-              console.log(`Level 2 commission: ${level2Commission} MXI to ${users[level2Index].username}`);
-
               if (users[level2Index].referredBy) {
                 const level3Index = users.findIndex(u => u.id === users[level2Index].referredBy);
                 if (level3Index !== -1) {
                   const level3Commission = commissionAmount * 0.2;
                   users[level3Index].balance += level3Commission;
                   users[level3Index].referralEarnings += level3Commission;
+                  users[level3Index].withdrawalRestrictions.commissionEarnings += level3Commission;
 
                   const level3CommissionTransaction: Transaction = {
                     id: `COM-${Date.now()}-${Math.random().toString(36).substring(2, 9).toUpperCase()}`,
@@ -408,8 +664,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                   
                   if (!users[level3Index].transactions) users[level3Index].transactions = [];
                   users[level3Index].transactions.unshift(level3CommissionTransaction);
-
-                  console.log(`Level 3 commission: ${level3Commission} MXI to ${users[level3Index].username}`);
                 }
               }
             }
@@ -442,90 +696,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const withdrawMXI = async (
-    platform: string,
-    address: string,
-    amount: number
-  ): Promise<{ success: boolean; message?: string }> => {
-    if (!user) {
-      return { success: false, message: 'User not authenticated' };
-    }
-
-    try {
-      const usersData = await AsyncStorage.getItem(STORAGE_KEYS.USERS);
-      if (!usersData) {
-        return { success: false, message: 'Failed to load users data' };
-      }
-
-      const users: User[] = JSON.parse(usersData);
-      const userIndex = users.findIndex(u => u.id === user.id);
-
-      if (userIndex === -1) {
-        return { success: false, message: 'User not found' };
-      }
-
-      if (users[userIndex].balance < amount) {
-        return { success: false, message: 'Insufficient balance' };
-      }
-
-      users[userIndex].balance -= amount;
-
-      const withdrawalTransaction: Transaction = {
-        id: `WTH-${Date.now()}-${Math.random().toString(36).substring(2, 9).toUpperCase()}`,
-        type: 'withdrawal',
-        amount: -amount,
-        to: address,
-        description: `Withdrawal to ${platform}`,
-        timestamp: new Date().toISOString(),
-        status: 'completed',
-      };
-
-      if (!users[userIndex].transactions) users[userIndex].transactions = [];
-      users[userIndex].transactions.unshift(withdrawalTransaction);
-
-      await AsyncStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
-      setUser(users[userIndex]);
-
-      console.log('Withdrawal completed:', {
-        transactionId: withdrawalTransaction.id,
-        user: user.username,
-        uniqueId: user.uniqueIdentifier,
-        platform,
-        address,
-        amount,
-        timestamp: new Date().toISOString(),
-      });
-
-      return { success: true };
-    } catch (error) {
-      console.error('Error withdrawing MXI:', error);
-      return { success: false, message: 'Withdrawal failed' };
-    }
-  };
-
-  const updateWithdrawalAddress = async (platform: string, address: string) => {
-    if (!user) return;
-
-    try {
-      const usersData = await AsyncStorage.getItem(STORAGE_KEYS.USERS);
-      if (!usersData) return;
-
-      const users: User[] = JSON.parse(usersData);
-      const userIndex = users.findIndex(u => u.id === user.id);
-
-      if (userIndex !== -1) {
-        if (!users[userIndex].withdrawalAddresses) {
-          users[userIndex].withdrawalAddresses = {};
-        }
-        users[userIndex].withdrawalAddresses[platform.toLowerCase()] = address;
-        await AsyncStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
-        setUser(users[userIndex]);
-      }
-    } catch (error) {
-      console.error('Error updating withdrawal address:', error);
-    }
-  };
-
   const purchaseMaxcoin = async (amount: number) => {
     if (!user) return;
 
@@ -542,6 +712,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         users[userIndex].balance += amount;
         users[userIndex].totalPurchases += amount;
         
+        // Track as purchased amount (can be withdrawn)
+        users[userIndex].withdrawalRestrictions.purchasedAmount += amount;
+        
         const powerIncrease = (users[userIndex].totalPurchases / config.powerIncreaseThreshold) * (config.powerIncreasePercent / 100);
         users[userIndex].miningPower = 1 + powerIncrease;
 
@@ -557,12 +730,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (!users[userIndex].transactions) users[userIndex].transactions = [];
         users[userIndex].transactions.unshift(purchaseTransaction);
 
+        // Distribute referral commissions
         if (users[userIndex].referredBy) {
           const level1Index = users.findIndex(u => u.id === users[userIndex].referredBy);
           if (level1Index !== -1) {
             const level1Commission = amount * (config.level1Commission / 100);
             users[level1Index].balance += level1Commission;
             users[level1Index].referralEarnings += level1Commission;
+            users[level1Index].withdrawalRestrictions.commissionEarnings += level1Commission;
 
             const commissionTransaction: Transaction = {
               id: `COM-${Date.now()}-${Math.random().toString(36).substring(2, 9).toUpperCase()}`,
@@ -577,14 +752,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             if (!users[level1Index].transactions) users[level1Index].transactions = [];
             users[level1Index].transactions.unshift(commissionTransaction);
 
-            console.log(`Level 1 referral commission: ${level1Commission} MXI (${config.level1Commission}%)`);
-
             if (users[level1Index].referredBy) {
               const level2Index = users.findIndex(u => u.id === users[level1Index].referredBy);
               if (level2Index !== -1) {
                 const level2Commission = amount * (config.level2Commission / 100);
                 users[level2Index].balance += level2Commission;
                 users[level2Index].referralEarnings += level2Commission;
+                users[level2Index].withdrawalRestrictions.commissionEarnings += level2Commission;
 
                 const level2CommissionTransaction: Transaction = {
                   id: `COM-${Date.now()}-${Math.random().toString(36).substring(2, 9).toUpperCase()}`,
@@ -599,14 +773,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 if (!users[level2Index].transactions) users[level2Index].transactions = [];
                 users[level2Index].transactions.unshift(level2CommissionTransaction);
 
-                console.log(`Level 2 referral commission: ${level2Commission} MXI (${config.level2Commission}%)`);
-
                 if (users[level2Index].referredBy) {
                   const level3Index = users.findIndex(u => u.id === users[level2Index].referredBy);
                   if (level3Index !== -1) {
                     const level3Commission = amount * (config.level3Commission / 100);
                     users[level3Index].balance += level3Commission;
                     users[level3Index].referralEarnings += level3Commission;
+                    users[level3Index].withdrawalRestrictions.commissionEarnings += level3Commission;
 
                     const level3CommissionTransaction: Transaction = {
                       id: `COM-${Date.now()}-${Math.random().toString(36).substring(2, 9).toUpperCase()}`,
@@ -620,8 +793,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     
                     if (!users[level3Index].transactions) users[level3Index].transactions = [];
                     users[level3Index].transactions.unshift(level3CommissionTransaction);
-
-                    console.log(`Level 3 referral commission: ${level3Commission} MXI (${config.level3Commission}%)`);
                   }
                 }
               }
@@ -650,6 +821,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (userIndex !== -1) {
         users[userIndex].referralEarnings += amount;
         users[userIndex].balance += amount;
+        users[userIndex].withdrawalRestrictions.commissionEarnings += amount;
         await AsyncStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
         setUser(users[userIndex]);
       }
@@ -680,6 +852,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         updateWithdrawalAddress,
         getUserByReferralCode,
         getTransactionHistory,
+        canWithdrawAmount,
       }}
     >
       {children}

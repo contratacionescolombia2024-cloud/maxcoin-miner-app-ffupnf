@@ -278,7 +278,7 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Purchase Card */}
+        {/* Purchase Card - Updated with new quick options */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>{t('home.purchaseMaxcoin')}</Text>
           <Text style={styles.cardSubtitle}>
@@ -288,34 +288,45 @@ export default function HomeScreen() {
           <View style={styles.purchaseGrid}>
             <Pressable 
               style={styles.purchaseButton}
-              onPress={() => router.push('/purchase?amount=10')}
+              onPress={() => router.push('/purchase?amount=0.02')}
             >
               <IconSymbol name="plus.circle.fill" size={32} color={colors.primary} />
-              <Text style={styles.purchaseAmount}>10 MXI</Text>
+              <Text style={styles.purchaseAmount}>0.02 MXI</Text>
               <Text style={styles.purchaseBonus}>
-                +{((10 / config.powerIncreaseThreshold) * config.powerIncreasePercent).toFixed(1)}% {t('home.power')}
+                +{((0.02 / config.powerIncreaseThreshold) * config.powerIncreasePercent).toFixed(3)}% {t('home.power')}
               </Text>
             </Pressable>
 
             <Pressable 
               style={styles.purchaseButton}
-              onPress={() => router.push('/purchase?amount=50')}
+              onPress={() => router.push('/purchase?amount=0.2')}
             >
               <IconSymbol name="plus.circle.fill" size={32} color={colors.primary} />
-              <Text style={styles.purchaseAmount}>50 MXI</Text>
+              <Text style={styles.purchaseAmount}>0.2 MXI</Text>
               <Text style={styles.purchaseBonus}>
-                +{((50 / config.powerIncreaseThreshold) * config.powerIncreasePercent).toFixed(1)}% {t('home.power')}
+                +{((0.2 / config.powerIncreaseThreshold) * config.powerIncreasePercent).toFixed(3)}% {t('home.power')}
               </Text>
             </Pressable>
 
             <Pressable 
               style={styles.purchaseButton}
-              onPress={() => router.push('/purchase?amount=100')}
+              onPress={() => router.push('/purchase?amount=2.0')}
             >
               <IconSymbol name="plus.circle.fill" size={32} color={colors.accent} />
-              <Text style={styles.purchaseAmount}>100 MXI</Text>
+              <Text style={styles.purchaseAmount}>2.0 MXI</Text>
               <Text style={styles.purchaseBonus}>
-                +{((100 / config.powerIncreaseThreshold) * config.powerIncreasePercent).toFixed(1)}% {t('home.power')}
+                +{((2.0 / config.powerIncreaseThreshold) * config.powerIncreasePercent).toFixed(2)}% {t('home.power')}
+              </Text>
+            </Pressable>
+
+            <Pressable 
+              style={styles.purchaseButton}
+              onPress={() => router.push('/purchase?amount=200')}
+            >
+              <IconSymbol name="plus.circle.fill" size={32} color={colors.success} />
+              <Text style={styles.purchaseAmount}>200 MXI</Text>
+              <Text style={styles.purchaseBonus}>
+                +{((200 / config.powerIncreaseThreshold) * config.powerIncreasePercent).toFixed(1)}% {t('home.power')}
               </Text>
             </Pressable>
           </View>
@@ -524,11 +535,13 @@ const styles = StyleSheet.create({
   },
   purchaseGrid: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 12,
     marginBottom: 8,
   },
   purchaseButton: {
     flex: 1,
+    minWidth: '45%',
     backgroundColor: colors.background,
     borderRadius: 12,
     padding: 16,
@@ -536,12 +549,12 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   purchaseAmount: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
     color: colors.text,
   },
   purchaseBonus: {
-    fontSize: 12,
+    fontSize: 11,
     color: colors.success,
     fontWeight: '600',
   },

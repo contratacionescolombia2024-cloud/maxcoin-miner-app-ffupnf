@@ -21,10 +21,10 @@ export default function PurchaseScreen() {
   const { user } = useAuth();
   const { config } = useMiningConfig();
   const { t } = useLocalization();
-  const [customAmount, setCustomAmount] = useState(paramAmount || '10');
+  const [customAmount, setCustomAmount] = useState(paramAmount || '0.02');
   const [error, setError] = useState('');
 
-  const purchaseAmount = parseFloat(customAmount || '10');
+  const purchaseAmount = parseFloat(customAmount || '0.02');
   const isValidAmount = purchaseAmount >= config.minPurchase && purchaseAmount <= config.maxPurchase;
   
   // Calculate mining power increase based on config
@@ -94,39 +94,33 @@ export default function PurchaseScreen() {
             </View>
           ) : null}
 
-          {/* Quick Amount Buttons */}
+          {/* Quick Amount Buttons - Updated values */}
           <View style={styles.quickAmountContainer}>
             <Text style={styles.quickAmountLabel}>{t('purchase.quickSelect')}</Text>
             <View style={styles.quickAmountButtons}>
               <Pressable
                 style={styles.quickAmountButton}
-                onPress={() => handleAmountChange('10')}
+                onPress={() => handleAmountChange('0.02')}
               >
-                <Text style={styles.quickAmountText}>10</Text>
+                <Text style={styles.quickAmountText}>0.02</Text>
               </Pressable>
               <Pressable
                 style={styles.quickAmountButton}
-                onPress={() => handleAmountChange('50')}
+                onPress={() => handleAmountChange('0.2')}
               >
-                <Text style={styles.quickAmountText}>50</Text>
+                <Text style={styles.quickAmountText}>0.2</Text>
               </Pressable>
               <Pressable
                 style={styles.quickAmountButton}
-                onPress={() => handleAmountChange('100')}
+                onPress={() => handleAmountChange('2.0')}
               >
-                <Text style={styles.quickAmountText}>100</Text>
+                <Text style={styles.quickAmountText}>2.0</Text>
               </Pressable>
               <Pressable
                 style={styles.quickAmountButton}
-                onPress={() => handleAmountChange('500')}
+                onPress={() => handleAmountChange('200')}
               >
-                <Text style={styles.quickAmountText}>500</Text>
-              </Pressable>
-              <Pressable
-                style={styles.quickAmountButton}
-                onPress={() => handleAmountChange('1000')}
-              >
-                <Text style={styles.quickAmountText}>1000</Text>
+                <Text style={styles.quickAmountText}>200</Text>
               </Pressable>
             </View>
           </View>
@@ -138,7 +132,7 @@ export default function PurchaseScreen() {
 
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>{t('purchase.amount')}</Text>
-            <Text style={styles.detailValue}>{purchaseAmount.toFixed(2)} MXI</Text>
+            <Text style={styles.detailValue}>{purchaseAmount.toFixed(6)} MXI</Text>
           </View>
 
           <View style={styles.detailRow}>
@@ -149,7 +143,7 @@ export default function PurchaseScreen() {
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>{t('purchase.powerIncrease')}</Text>
             <Text style={[styles.detailValue, { color: colors.success }]}>
-              +{miningPowerIncrease.toFixed(2)}x
+              +{miningPowerIncrease.toFixed(4)}x
             </Text>
           </View>
 
@@ -157,7 +151,7 @@ export default function PurchaseScreen() {
 
           <View style={styles.detailRow}>
             <Text style={styles.detailLabelBold}>{t('purchase.newPower')}</Text>
-            <Text style={styles.detailValueBold}>{newMiningPower.toFixed(2)}x</Text>
+            <Text style={styles.detailValueBold}>{newMiningPower.toFixed(4)}x</Text>
           </View>
 
           <View style={styles.infoBox}>
@@ -180,7 +174,7 @@ export default function PurchaseScreen() {
             <View style={styles.bonusInfo}>
               <Text style={styles.bonusLabel}>{t('purchase.level1Referrer')}</Text>
               <Text style={styles.bonusValue}>
-                +{(purchaseAmount * (config.level1Commission / 100)).toFixed(4)} MXI ({config.level1Commission}%)
+                +{(purchaseAmount * (config.level1Commission / 100)).toFixed(6)} MXI ({config.level1Commission}%)
               </Text>
             </View>
           </View>
@@ -190,7 +184,7 @@ export default function PurchaseScreen() {
             <View style={styles.bonusInfo}>
               <Text style={styles.bonusLabel}>{t('purchase.level2Referrer')}</Text>
               <Text style={styles.bonusValue}>
-                +{(purchaseAmount * (config.level2Commission / 100)).toFixed(4)} MXI ({config.level2Commission}%)
+                +{(purchaseAmount * (config.level2Commission / 100)).toFixed(6)} MXI ({config.level2Commission}%)
               </Text>
             </View>
           </View>
@@ -200,7 +194,7 @@ export default function PurchaseScreen() {
             <View style={styles.bonusInfo}>
               <Text style={styles.bonusLabel}>{t('purchase.level3Referrer')}</Text>
               <Text style={styles.bonusValue}>
-                +{(purchaseAmount * (config.level3Commission / 100)).toFixed(4)} MXI ({config.level3Commission}%)
+                +{(purchaseAmount * (config.level3Commission / 100)).toFixed(6)} MXI ({config.level3Commission}%)
               </Text>
             </View>
           </View>
@@ -331,8 +325,8 @@ const styles = StyleSheet.create({
   quickAmountButton: {
     backgroundColor: colors.background,
     borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
     borderWidth: 2,
     borderColor: colors.primary,
   },

@@ -17,25 +17,25 @@ import { colors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 
 export default function LoginScreen() {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { login } = useAuth();
 
   const handleLogin = async () => {
-    if (!username.trim() || !password.trim()) {
-      Alert.alert('Error', 'Please enter both username and password');
+    if (!email.trim() || !password.trim()) {
+      Alert.alert('Error', 'Please enter email and password');
       return;
     }
 
     setIsLoading(true);
-    const success = await login(username.trim(), password);
+    const result = await login(email.trim(), password);
     setIsLoading(false);
 
-    if (success) {
+    if (result.success) {
       router.replace('/(tabs)/(home)');
     } else {
-      Alert.alert('Error', 'Invalid username or password');
+      Alert.alert('Login Failed', result.message || 'Invalid credentials');
     }
   };
 
@@ -49,22 +49,23 @@ export default function LoginScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.header}>
-          <IconSymbol name="bitcoinsign.circle.fill" size={80} color={colors.primary} />
+          <IconSymbol name="bitcoinsign.circle.fill" size={100} color={colors.primary} />
           <Text style={styles.title}>Maxcoin MXI</Text>
-          <Text style={styles.subtitle}>Mining Platform</Text>
+          <Text style={styles.subtitle}>Mine cryptocurrency on your device</Text>
         </View>
 
         <View style={styles.form}>
           <View style={styles.inputContainer}>
-            <IconSymbol name="person.fill" size={20} color={colors.textSecondary} />
+            <IconSymbol name="envelope.fill" size={20} color={colors.textSecondary} />
             <TextInput
               style={styles.input}
-              placeholder="Username"
+              placeholder="Email Address"
               placeholderTextColor={colors.textSecondary}
-              value={username}
-              onChangeText={setUsername}
+              value={email}
+              onChangeText={setEmail}
               autoCapitalize="none"
               autoCorrect={false}
+              keyboardType="email-address"
             />
           </View>
 
@@ -91,12 +92,6 @@ export default function LoginScreen() {
             </Text>
           </Pressable>
 
-          <View style={styles.divider}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>OR</Text>
-            <View style={styles.dividerLine} />
-          </View>
-
           <Pressable
             style={[styles.button, styles.secondaryButton]}
             onPress={() => router.push('/(auth)/register')}
@@ -105,6 +100,13 @@ export default function LoginScreen() {
               Create Account
             </Text>
           </Pressable>
+        </View>
+
+        <View style={styles.infoCard}>
+          <IconSymbol name="info.circle.fill" size={20} color={colors.primary} />
+          <Text style={styles.infoText}>
+            Login with your verified email address. No duplicate accounts allowed.
+          </Text>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -126,7 +128,7 @@ const styles = StyleSheet.create({
     marginBottom: 48,
   },
   title: {
-    fontSize: 32,
+    fontSize: 36,
     fontWeight: '800',
     color: colors.text,
     marginTop: 16,
@@ -135,6 +137,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.textSecondary,
     marginTop: 4,
+    textAlign: 'center',
   },
   form: {
     width: '100%',
@@ -161,10 +164,10 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 12,
   },
   primaryButton: {
     backgroundColor: colors.primary,
-    marginTop: 8,
   },
   secondaryButton: {
     backgroundColor: colors.card,
@@ -179,21 +182,19 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#ffffff',
   },
-  divider: {
+  infoCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 24,
+    backgroundColor: colors.highlight,
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 24,
+    gap: 12,
   },
-  dividerLine: {
+  infoText: {
     flex: 1,
-    height: 1,
-    backgroundColor: colors.textSecondary,
-    opacity: 0.3,
-  },
-  dividerText: {
-    marginHorizontal: 16,
-    fontSize: 14,
-    color: colors.textSecondary,
-    fontWeight: '600',
+    fontSize: 13,
+    color: colors.text,
+    lineHeight: 18,
   },
 });

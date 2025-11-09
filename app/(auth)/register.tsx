@@ -18,15 +18,26 @@ import { IconSymbol } from '@/components/IconSymbol';
 
 export default function RegisterScreen() {
   const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [referralCode, setReferralCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { register } = useAuth();
 
+  const validateEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
   const handleRegister = async () => {
-    if (!username.trim() || !password.trim()) {
-      Alert.alert('Error', 'Please enter username and password');
+    if (!username.trim() || !email.trim() || !password.trim()) {
+      Alert.alert('Error', 'Please fill in all required fields');
+      return;
+    }
+
+    if (!validateEmail(email.trim())) {
+      Alert.alert('Error', 'Please enter a valid email address');
       return;
     }
 
@@ -41,17 +52,18 @@ export default function RegisterScreen() {
     }
 
     setIsLoading(true);
-    const success = await register(
+    const result = await register(
       username.trim(),
+      email.trim(),
       password,
       referralCode.trim() || undefined
     );
     setIsLoading(false);
 
-    if (success) {
+    if (result.success) {
       Alert.alert(
         'Success!',
-        'Your account has been created successfully',
+        'Your account has been created and email verified successfully',
         [
           {
             text: 'OK',
@@ -60,7 +72,7 @@ export default function RegisterScreen() {
         ]
       );
     } else {
-      Alert.alert('Error', 'Username already exists');
+      Alert.alert('Error', result.message || 'Registration failed');
     }
   };
 
@@ -90,6 +102,20 @@ export default function RegisterScreen() {
               onChangeText={setUsername}
               autoCapitalize="none"
               autoCorrect={false}
+            />
+          </View>
+
+          <View style={styles.inputContainer}>
+            <IconSymbol name="envelope.fill" size={20} color={colors.textSecondary} />
+            <TextInput
+              style={styles.input}
+              placeholder="Email Address"
+              placeholderTextColor={colors.textSecondary}
+              value={email}
+              onChangeText={setEmail}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="email-address"
             />
           </View>
 
@@ -134,6 +160,13 @@ export default function RegisterScreen() {
 
           <View style={styles.infoBox}>
             <IconSymbol name="info.circle.fill" size={20} color={colors.primary} />
+            <Text style={styles.infoText}>
+              Your email will be verified automatically. No duplicate accounts are allowed.
+            </Text>
+          </View>
+
+          <View style={styles.infoBox}>
+            <IconSymbol name="checkmark.shield.fill" size={20} color={colors.success} />
             <Text style={styles.infoText}>
               Enter a referral code to earn bonuses for both you and your referrer!
             </Text>
@@ -215,7 +248,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.highlight,
     borderRadius: 12,
     padding: 12,
-    marginBottom: 24,
+    marginBottom: 16,
     gap: 10,
   },
   infoText: {

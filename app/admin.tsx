@@ -154,7 +154,26 @@ export default function AdminScreen() {
         <View style={styles.header}>
           <IconSymbol name="gearshape.fill" size={60} color={colors.primary} />
           <Text style={styles.title}>Admin Panel</Text>
-          <Text style={styles.subtitle}>Configure mining parameters</Text>
+          <Text style={styles.subtitle}>Configure mining parameters and manage users</Text>
+        </View>
+
+        {/* Quick Access Card */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Quick Access</Text>
+          
+          <Pressable 
+            style={styles.quickAccessButton}
+            onPress={() => router.push('/admin-users')}
+          >
+            <IconSymbol name="person.2.badge.key.fill" size={32} color={colors.primary} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.quickAccessTitle}>User Management</Text>
+              <Text style={styles.quickAccessSubtitle}>
+                View all users, transfer balances, block accounts
+              </Text>
+            </View>
+            <IconSymbol name="chevron.right" size={20} color={colors.textSecondary} />
+          </Pressable>
         </View>
 
         {/* Mining Rate Configuration */}
@@ -171,7 +190,7 @@ export default function AdminScreen() {
                 style={styles.input}
                 value={miningRate}
                 onChangeText={setMiningRate}
-                placeholder="0.02"
+                placeholder="0.0002"
                 placeholderTextColor={colors.textSecondary}
                 keyboardType="decimal-pad"
               />
@@ -197,7 +216,7 @@ export default function AdminScreen() {
                 style={styles.input}
                 value={minPurchase}
                 onChangeText={setMinPurchase}
-                placeholder="10"
+                placeholder="0.02"
                 placeholderTextColor={colors.textSecondary}
                 keyboardType="numeric"
               />
@@ -417,6 +436,25 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '700',
     color: colors.text,
+  },
+  quickAccessButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.background,
+    borderRadius: 12,
+    padding: 16,
+    gap: 12,
+  },
+  quickAccessTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: 4,
+  },
+  quickAccessSubtitle: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    lineHeight: 18,
   },
   inputGroup: {
     marginBottom: 16,
