@@ -15,7 +15,7 @@ import { colors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 
 export default function PaymentMethodsScreen() {
-  const { purchaseMaxcoin, recordFirstPurchase } = useAuth();
+  const { purchaseMaxcoin, recordFirstPurchase, user } = useAuth();
   const { t } = useLocalization();
   const params = useLocalSearchParams();
   const amount = parseFloat(params.amount as string) || 0;
@@ -49,12 +49,19 @@ export default function PaymentMethodsScreen() {
       // Complete the purchase
       await purchaseMaxcoin(amount);
       
-      // Record first purchase if it's at least 100 USDT
+      // Record first purchase for referral tracking
       await recordFirstPurchase(usdValue);
+      
+      let successMessage = `Successfully purchased ${amount.toFixed(6)} MXI!`;
+      
+      // Check if user still needs to make unlock payment
+      if (!user?.unlockPaymentMade) {
+        successMessage += '\n\nNote: To access Mining and Lottery features, you need to make the 100 USDT unlock payment separately.';
+      }
       
       Alert.alert(
         'Success',
-        `Successfully purchased ${amount.toFixed(6)} MXI!${usdValue >= 100 ? '\n\nCongratulations! You have unlocked Mining and Lottery features!' : ''}`,
+        successMessage,
         [
           {
             text: 'OK',
@@ -94,11 +101,11 @@ export default function PaymentMethodsScreen() {
             <Text style={styles.amountUSD}>${usdValue.toFixed(2)} USDT</Text>
           </View>
           
-          {usdValue >= 100 && (
+          {!user?.unlockPaymentMade && (
             <View style={styles.unlockNotice}>
-              <IconSymbol name="star.fill" size={24} color="#FFD700" />
+              <IconSymbol name="info.circle.fill" size={24} color={colors.primary} />
               <Text style={styles.unlockNoticeText}>
-                This purchase will unlock Mining and Lottery features!
+                This is a mining power purchase. To unlock Mining and Lottery features, make the 100 USDT unlock payment separately.
               </Text>
             </View>
           )}
@@ -151,10 +158,13 @@ export default function PaymentMethodsScreen() {
             - Referral commissions are distributed automatically
           </Text>
           <Text style={styles.noteText}>
-            - First purchase of 100 USDT unlocks Mining and Lottery
+            - This is for mining power purchases only
           </Text>
           <Text style={styles.noteText}>
             - Mining power increases with USDT purchases (1% per 10 USDT)
+          </Text>
+          <Text style={styles.noteText}>
+            - Unlock payment (100 USDT) is separate and required for Mining/Lottery
           </Text>
           <Text style={styles.noteText}>
             - All transactions are recorded in your history

@@ -53,6 +53,8 @@ export interface User {
   isBlocked?: boolean;
   hasMiningAccess?: boolean;
   hasFirstPurchase?: boolean;
+  unlockPaymentMade?: boolean;
+  unlockPaymentDate?: string;
 }
 
 interface AuthContextType {
@@ -74,6 +76,7 @@ interface AuthContextType {
   getReferralLink: () => string;
   getActiveReferralsCount: () => Promise<number>;
   recordFirstPurchase: (usdAmount: number) => Promise<void>;
+  recordUnlockPayment: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -236,6 +239,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           isBlocked: userData.is_blocked,
           hasMiningAccess: userData.has_mining_access,
           hasFirstPurchase: userData.has_first_purchase,
+          unlockPaymentMade: userData.unlock_payment_made,
+          unlockPaymentDate: userData.unlock_payment_date,
         };
 
         setUser(mappedUser);
@@ -277,7 +282,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (!user) return;
 
     try {
-      if (!user.hasFirstPurchase && usdAmount >= 100) {
+      if (!user.hasFirstPurchase && usdAmount > 0) {
         const { error } = await supabase
           .from('users')
           .update({ has_first_purchase: true })
@@ -285,11 +290,34 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         if (!error) {
           await refreshUser();
-          console.log('First purchase of 100 USDT recorded - Mining and Lottery unlocked');
+          console.log('First purchase recorded for referral tracking');
         }
       }
     } catch (error) {
       console.error('Error recording first purchase:', error);
+    }
+  };
+
+  const recordUnlockPayment = async () => {
+    if (!user) return;
+
+    try {
+      if (!user.unlockPaymentMade) {
+        const { error } = await supabase
+          .from('users')
+          .update({ 
+            unlock_payment_made: true,
+            unlock_payment_date: new Date().toISOString(),
+          })
+          .eq('id', user.id);
+
+        if (!error) {
+          await refreshUser();
+          console.log('100 USDT unlock payment recorded - Mining and Lottery features unlocked');
+        }
+      }
+    } catch (error) {
+      console.error('Error recording unlock payment:', error);
     }
   };
 
@@ -366,6 +394,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           is_blocked: false,
           has_mining_access: false,
           has_first_purchase: false,
+          unlock_payment_made: false,
         });
 
       if (profileError) {
@@ -679,6 +708,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         isBlocked: data.is_blocked,
         hasMiningAccess: data.has_mining_access,
         hasFirstPurchase: data.has_first_purchase,
+        unlockPaymentMade: data.unlock_payment_made,
+        unlockPaymentDate: data.unlock_payment_date,
       };
     } catch (error) {
       console.error('Error finding user by referral code:', error);
@@ -859,6 +890,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         getReferralLink,
         getActiveReferralsCount,
         recordFirstPurchase,
+        recordUnlockPayment,
       }}
     >
       {children}

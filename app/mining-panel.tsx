@@ -49,13 +49,13 @@ export default function MiningPanelScreen() {
   }, []);
 
   const handlePurchaseAccess = () => {
-    if (!user?.hasFirstPurchase) {
+    if (!user?.unlockPaymentMade) {
       Alert.alert(
-        'First Purchase Required',
-        'You must make your first purchase of at least 100 USDT before accessing mining features. Would you like to purchase mining power now?',
+        'Unlock Payment Required',
+        'You must make the 100 USDT unlock payment before accessing mining features. This is separate from mining power purchases.',
         [
           { text: 'Cancel', style: 'cancel' },
-          { text: 'Purchase Now', onPress: () => router.push('/purchase') },
+          { text: 'Make Unlock Payment', onPress: () => router.push('/unlock-payment') },
         ]
       );
       return;
@@ -119,8 +119,8 @@ export default function MiningPanelScreen() {
     );
   }
 
-  // Check if user has made first purchase
-  if (!user?.hasFirstPurchase) {
+  // Check if user has made unlock payment
+  if (!user?.unlockPaymentMade) {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
@@ -136,31 +136,34 @@ export default function MiningPanelScreen() {
             <IconSymbol name="lock.fill" size={64} color={colors.warning} />
             <Text style={styles.lockedTitle}>Mining Access Locked</Text>
             <Text style={styles.lockedDescription}>
-              To unlock mining features, you must make your first purchase of at least 100 USDT worth of mining power.
+              To unlock mining features, you must make the mandatory 100 USDT unlock payment. This is separate from mining power purchases.
             </Text>
             
             <View style={styles.requirementBox}>
               <Text style={styles.requirementTitle}>Requirements:</Text>
               <Text style={styles.requirementText}>
-                - First purchase: 100 USDT minimum
+                - One-time unlock payment: 100 USDT
               </Text>
               <Text style={styles.requirementText}>
                 - This unlocks both Mining and Lottery features
               </Text>
               <Text style={styles.requirementText}>
+                - Separate from mining power purchases
+              </Text>
+              <Text style={styles.requirementText}>
                 - After unlocking, you can purchase the mining package
               </Text>
               <Text style={styles.requirementText}>
-                - All purchases are valid for 30 days
+                - Mining package costs 100 USDT for 30 days
               </Text>
             </View>
 
             <Pressable 
               style={styles.unlockButton} 
-              onPress={() => router.push('/purchase')}
+              onPress={() => router.push('/unlock-payment')}
             >
-              <IconSymbol name="cart.fill" size={20} color={colors.background} />
-              <Text style={styles.unlockButtonText}>Purchase Mining Power (USDT)</Text>
+              <IconSymbol name="lock.open.fill" size={20} color={colors.background} />
+              <Text style={styles.unlockButtonText}>Make Unlock Payment (100 USDT)</Text>
             </Pressable>
           </View>
         </ScrollView>

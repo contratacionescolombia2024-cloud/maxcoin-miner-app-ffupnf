@@ -101,6 +101,25 @@ export default function HomeScreen() {
           Platform.OS !== 'ios' && styles.scrollContentWithTabBar
         ]}
       >
+        {/* Unlock Payment Notice */}
+        {!user.unlockPaymentMade && (
+          <Pressable 
+            style={styles.unlockNoticeCard}
+            onPress={() => router.push('/unlock-payment')}
+          >
+            <View style={styles.unlockNoticeIcon}>
+              <IconSymbol name="lock.fill" size={32} color="#FFD700" />
+            </View>
+            <View style={styles.unlockNoticeContent}>
+              <Text style={styles.unlockNoticeTitle}>Unlock All Features</Text>
+              <Text style={styles.unlockNoticeText}>
+                Make the 100 USDT unlock payment to access Mining and Lottery features
+              </Text>
+            </View>
+            <IconSymbol name="chevron.right" size={24} color={colors.textSecondary} />
+          </Pressable>
+        )}
+
         {/* Balance Card */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
@@ -450,5 +469,40 @@ const styles = StyleSheet.create({
   },
   headerButtonContainer: {
     padding: 6,
+  },
+  unlockNoticeCard: {
+    backgroundColor: colors.card,
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    borderWidth: 2,
+    borderColor: '#FFD700',
+    boxShadow: '0px 4px 12px rgba(255, 215, 0, 0.2)',
+    elevation: 5,
+  },
+  unlockNoticeIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  unlockNoticeContent: {
+    flex: 1,
+  },
+  unlockNoticeTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: colors.text,
+    marginBottom: 4,
+  },
+  unlockNoticeText: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    lineHeight: 20,
   },
 });

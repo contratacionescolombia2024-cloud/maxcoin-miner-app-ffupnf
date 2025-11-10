@@ -224,6 +224,15 @@ export default function PurchaseScreen() {
           </View>
         </View>
 
+        {!user?.unlockPaymentMade && (
+          <View style={styles.unlockWarning}>
+            <IconSymbol name="lock.fill" size={20} color={colors.warning} />
+            <Text style={styles.unlockWarningText}>
+              Note: This purchase boosts mining power, but you need to make the 100 USDT unlock payment separately to access Mining and Lottery features.
+            </Text>
+          </View>
+        )}
+
         <View style={styles.durationWarning}>
           <IconSymbol name="clock.fill" size={20} color={colors.warning} />
           <Text style={styles.durationWarningText}>
@@ -450,6 +459,24 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.textSecondary,
     lineHeight: 18,
+  },
+  unlockWarning: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: colors.cardBackground,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    gap: 12,
+    borderWidth: 2,
+    borderColor: '#FFD700',
+  },
+  unlockWarningText: {
+    flex: 1,
+    fontSize: 14,
+    color: colors.text,
+    lineHeight: 20,
+    fontWeight: '500',
   },
   durationWarning: {
     flexDirection: 'row',
