@@ -24,17 +24,17 @@ export const buttonStyles = StyleSheet.create({
     backgroundColor: colors.primary,
     alignSelf: 'center',
     width: '100%',
-  },
+  } as ViewStyle,
   secondaryButton: {
     backgroundColor: colors.secondary,
     alignSelf: 'center',
     width: '100%',
-  },
+  } as ViewStyle,
   accentButton: {
     backgroundColor: colors.accent,
     alignSelf: 'center',
     width: '100%',
-  },
+  } as ViewStyle,
 });
 
 export const commonStyles = StyleSheet.create({
@@ -42,27 +42,27 @@ export const commonStyles = StyleSheet.create({
     backgroundColor: colors.background,
     width: '100%',
     height: '100%',
-  },
+  } as ViewStyle,
   container: {
     flex: 1,
     backgroundColor: colors.background,
     width: '100%',
     height: '100%',
-  },
+  } as ViewStyle,
   content: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     maxWidth: 800,
     width: '100%',
-  },
+  } as ViewStyle,
   title: {
     fontSize: 24,
     fontWeight: '800',
     textAlign: 'center',
     color: colors.text,
     marginBottom: 10
-  },
+  } as TextStyle,
   text: {
     fontSize: 16,
     fontWeight: '500',
@@ -70,17 +70,17 @@ export const commonStyles = StyleSheet.create({
     marginBottom: 8,
     lineHeight: 24,
     textAlign: 'center',
-  },
+  } as TextStyle,
   section: {
     width: '100%',
     alignItems: 'center',
     paddingHorizontal: 20,
-  },
+  } as ViewStyle,
   buttonContainer: {
     width: '100%',
     alignItems: 'center',
     paddingHorizontal: 20,
-  },
+  } as ViewStyle,
   card: {
     backgroundColor: colors.card,
     borderRadius: 12,
@@ -89,10 +89,10 @@ export const commonStyles = StyleSheet.create({
     width: '100%',
     boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
     elevation: 3,
-  },
+  } as ViewStyle,
   icon: {
     width: 60,
     height: 60,
     tintColor: colors.primary,
-  },
+  } as ViewStyle,
 });
