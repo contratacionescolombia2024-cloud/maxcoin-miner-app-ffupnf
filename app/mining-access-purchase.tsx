@@ -16,7 +16,7 @@ import { colors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 
 export default function MiningAccessPurchaseScreen() {
-  const { user } = useAuth();
+  const { user, recordFirstPurchase } = useAuth();
   const { purchaseMiningAccess, renewMiningAccess, getMiningAccessCost } = useMiningAccess();
   const { mxiPrice } = useBinance();
   const params = useLocalSearchParams();
@@ -52,14 +52,21 @@ export default function MiningAccessPurchaseScreen() {
                 result = await renewMiningAccess(user.id);
               } else {
                 result = await purchaseMiningAccess(user.id, 'binance');
+                
+                // Record first purchase to unlock lottery and mining
+                await recordFirstPurchase(accessCost);
               }
 
               if (result.success) {
+                const unlockMessage = !isRenewal && !user.hasFirstPurchase 
+                  ? '\n\nCongratulations! You have unlocked Mining and Lottery features!' 
+                  : '';
+                
                 Alert.alert(
                   'Success',
                   isRenewal 
                     ? 'Mining access renewed successfully! Your access has been extended for 30 days.'
-                    : 'Mining access purchased successfully! You can now start mining MXI.',
+                    : `Mining access purchased successfully! You can now start mining MXI.${unlockMessage}`,
                   [
                     {
                       text: 'OK',
@@ -110,6 +117,15 @@ export default function MiningAccessPurchaseScreen() {
             <Text style={styles.costEquivalent}>≈ {mxiEquivalent.toFixed(2)} MXI</Text>
           </View>
 
+          {!isRenewal && !user?.hasFirstPurchase && (
+            <View style={styles.unlockNotice}>
+              <IconSymbol name="star.fill" size={24} color="#FFD700" />
+              <Text style={styles.unlockNoticeText}>
+                This purchase will unlock Mining and Lottery features!
+              </Text>
+            </View>
+          )}
+
           <View style={styles.divider} />
 
           <View style={styles.detailRow}>
@@ -143,6 +159,10 @@ export default function MiningAccessPurchaseScreen() {
             <View style={styles.benefitItem}>
               <IconSymbol name="checkmark.circle.fill" size={18} color={colors.success} />
               <Text style={styles.benefitText}>Access to withdrawal system</Text>
+            </View>
+            <View style={styles.benefitItem}>
+              <IconSymbol name="checkmark.circle.fill" size={18} color={colors.success} />
+              <Text style={styles.benefitText}>Access to MXILUCKY lottery</Text>
             </View>
             <View style={styles.benefitItem}>
               <IconSymbol name="checkmark.circle.fill" size={18} color={colors.success} />
@@ -183,6 +203,9 @@ export default function MiningAccessPurchaseScreen() {
             • Initial package cost is 100 USDT (paid via Binance)
           </Text>
           <Text style={styles.noteText}>
+            • This unlocks both Mining and Lottery features
+          </Text>
+          <Text style={styles.noteText}>
             • Mining access is valid for 30 days from purchase date
           </Text>
           <Text style={styles.noteText}>
@@ -192,10 +215,10 @@ export default function MiningAccessPurchaseScreen() {
             • Mining power increases with additional USDT purchases
           </Text>
           <Text style={styles.noteText}>
-            • All payments are processed through Binance Pay
+            • Lottery tickets are purchased with MXI from your balance
           </Text>
           <Text style={styles.noteText}>
-            • Commissions are paid at current MXI/USDT exchange rate
+            • All payments are processed through Binance Pay
           </Text>
         </View>
 
@@ -292,6 +315,25 @@ const styles = StyleSheet.create({
   costEquivalent: {
     fontSize: 16,
     color: colors.textSecondary,
+  },
+  unlockNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.background,
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 12,
+    marginBottom: 12,
+    borderWidth: 2,
+    borderColor: '#FFD700',
+    gap: 12,
+    width: '100%',
+  },
+  unlockNoticeText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.text,
+    flex: 1,
   },
   divider: {
     height: 1,

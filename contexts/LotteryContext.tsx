@@ -1,15 +1,15 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { supabase } from '@/app/integrations/supabase/client';
 
 export interface LotteryConfig {
-  ticketPrice: number; // Price per ticket in MXI
-  minTicketsForDraw: number; // Minimum tickets to trigger draw
-  numberOfWinners: number; // Number of winners per draw
-  prizePoolPercentage: number; // Percentage of pool for winners (90%)
-  adminPercentage: number; // Percentage for admin (10%)
-  drawDay: number; // Day of week (5 = Friday)
-  drawHour: number; // Hour in UTC (20 = 8 PM)
+  ticketPrice: number;
+  minTicketsForDraw: number;
+  numberOfWinners: number;
+  prizePoolPercentage: number;
+  adminPercentage: number;
+  drawDay: number;
+  drawHour: number;
 }
 
 export interface LotteryTicket {
@@ -53,19 +53,13 @@ interface LotteryContextType {
 }
 
 const DEFAULT_CONFIG: LotteryConfig = {
-  ticketPrice: 1, // 1 MXI per ticket
+  ticketPrice: 1,
   minTicketsForDraw: 1000,
   numberOfWinners: 4,
   prizePoolPercentage: 90,
   adminPercentage: 10,
-  drawDay: 5, // Friday
-  drawHour: 20, // 8 PM UTC
-};
-
-const STORAGE_KEYS = {
-  CONFIG: '@maxcoin_lottery_config',
-  TICKETS: '@maxcoin_lottery_tickets',
-  DRAWS: '@maxcoin_lottery_draws',
+  drawDay: 5,
+  drawHour: 20,
 };
 
 const LotteryContext = createContext<LotteryContextType | undefined>(undefined);
@@ -79,9 +73,27 @@ export const LotteryProvider = ({ children }: { children: ReactNode }) => {
 
   const loadConfig = async () => {
     try {
-      const savedConfig = await AsyncStorage.getItem(STORAGE_KEYS.CONFIG);
-      if (savedConfig) {
-        setConfig({ ...DEFAULT_CONFIG, ...JSON.parse(savedConfig) });
+      const { data, error } = await supabase
+        .from('lottery_config')
+        .select('*')
+        .single();
+
+      if (error) {
+        console.error('Error loading lottery config:', error);
+        return;
+      }
+
+      if (data) {
+        setConfig({
+          ticketPrice: parseFloat(data.ticket_price),
+          minTicketsForDraw: data.min_tickets_for_draw,
+          numberOfWinners: data.number_of_winners,
+          prizePoolPercentage: parseFloat(data.prize_pool_percentage),
+          adminPercentage: parseFloat(data.admin_percentage),
+          drawDay: data.draw_day,
+          drawHour: data.draw_hour,
+        });
+        console.log('Lottery config loaded from database');
       }
     } catch (error) {
       console.error('Error loading lottery config:', error);
@@ -91,7 +103,25 @@ export const LotteryProvider = ({ children }: { children: ReactNode }) => {
   const updateConfig = async (newConfig: Partial<LotteryConfig>) => {
     try {
       const updatedConfig = { ...config, ...newConfig };
-      await AsyncStorage.setItem(STORAGE_KEYS.CONFIG, JSON.stringify(updatedConfig));
+      
+      const { error } = await supabase
+        .from('lottery_config')
+        .update({
+          ticket_price: updatedConfig.ticketPrice,
+          min_tickets_for_draw: updatedConfig.minTicketsForDraw,
+          number_of_winners: updatedConfig.numberOfWinners,
+          prize_pool_percentage: updatedConfig.prizePoolPercentage,
+          admin_percentage: updatedConfig.adminPercentage,
+          draw_day: updatedConfig.drawDay,
+          draw_hour: updatedConfig.drawHour,
+        })
+        .eq('id', (await supabase.from('lottery_config').select('id').single()).data?.id);
+
+      if (error) {
+        console.error('Error updating lottery config:', error);
+        return;
+      }
+
       setConfig(updatedConfig);
       console.log('Lottery config updated:', updatedConfig);
     } catch (error) {
@@ -108,12 +138,10 @@ export const LotteryProvider = ({ children }: { children: ReactNode }) => {
     const now = new Date();
     const nextDraw = new Date(now);
     
-    // Set to next Friday at 20:00 UTC
     const daysUntilFriday = (config.drawDay - now.getUTCDay() + 7) % 7;
     nextDraw.setUTCDate(now.getUTCDate() + (daysUntilFriday === 0 ? 7 : daysUntilFriday));
     nextDraw.setUTCHours(config.drawHour, 0, 0, 0);
 
-    // If we're past this week's draw time, move to next week
     if (nextDraw <= now) {
       nextDraw.setUTCDate(nextDraw.getUTCDate() + 7);
     }
@@ -128,38 +156,88 @@ export const LotteryProvider = ({ children }: { children: ReactNode }) => {
     quantity: number
   ): Promise<{ success: boolean; message?: string; tickets?: LotteryTicket[] }> => {
     try {
-      const ticketsData = await AsyncStorage.getItem(STORAGE_KEYS.TICKETS);
-      const allTickets: LotteryTicket[] = ticketsData ? JSON.parse(ticketsData) : [];
-
       const drawId = getCurrentDrawId();
-      const newTickets: LotteryTicket[] = [];
 
       // Get current ticket count for this draw
-      const drawTickets = allTickets.filter(t => t.drawId === drawId);
-      let nextTicketNumber = drawTickets.length + 1;
+      const { count } = await supabase
+        .from('lottery_tickets')
+        .select('*', { count: 'exact', head: true })
+        .eq('draw_id', drawId);
 
+      let nextTicketNumber = (count || 0) + 1;
+      const newTickets: LotteryTicket[] = [];
+
+      // Insert tickets
       for (let i = 0; i < quantity; i++) {
-        const ticket: LotteryTicket = {
-          id: `TKT-${Date.now()}-${Math.random().toString(36).substring(2, 9).toUpperCase()}`,
-          userId,
-          username,
-          uniqueIdentifier: uniqueId,
-          purchaseDate: new Date().toISOString(),
-          drawId,
-          ticketNumber: nextTicketNumber++,
-        };
-        newTickets.push(ticket);
-        allTickets.push(ticket);
+        const ticketId = `TKT-${Date.now()}-${Math.random().toString(36).substring(2, 9).toUpperCase()}`;
+        
+        const { data, error } = await supabase
+          .from('lottery_tickets')
+          .insert({
+            ticket_id: ticketId,
+            user_id: userId,
+            username,
+            unique_identifier: uniqueId,
+            draw_id: drawId,
+            ticket_number: nextTicketNumber++,
+          })
+          .select()
+          .single();
+
+        if (error) {
+          console.error('Error inserting ticket:', error);
+          continue;
+        }
+
+        if (data) {
+          newTickets.push({
+            id: data.ticket_id,
+            userId: data.user_id,
+            username: data.username,
+            uniqueIdentifier: data.unique_identifier,
+            purchaseDate: data.purchase_date,
+            drawId: data.draw_id,
+            ticketNumber: data.ticket_number,
+          });
+        }
       }
 
-      await AsyncStorage.setItem(STORAGE_KEYS.TICKETS, JSON.stringify(allTickets));
+      // Update or create draw record
+      const totalCost = quantity * config.ticketPrice;
+      const prizePoolAmount = totalCost * (config.prizePoolPercentage / 100);
+
+      const { data: existingDraw } = await supabase
+        .from('lottery_draws')
+        .select('*')
+        .eq('draw_id', drawId)
+        .single();
+
+      if (existingDraw) {
+        await supabase
+          .from('lottery_draws')
+          .update({
+            total_tickets: existingDraw.total_tickets + quantity,
+            prize_pool: parseFloat(existingDraw.prize_pool) + prizePoolAmount,
+          })
+          .eq('draw_id', drawId);
+      } else {
+        await supabase
+          .from('lottery_draws')
+          .insert({
+            draw_id: drawId,
+            draw_date: getNextDrawDate().toISOString(),
+            total_tickets: quantity,
+            prize_pool: prizePoolAmount,
+            status: 'pending',
+          });
+      }
 
       console.log('Lottery tickets purchased:', {
         userId,
         username,
         quantity,
         drawId,
-        totalCost: quantity * config.ticketPrice,
+        totalCost,
       });
 
       return { success: true, tickets: newTickets };
@@ -171,13 +249,29 @@ export const LotteryProvider = ({ children }: { children: ReactNode }) => {
 
   const getUserTickets = async (userId: string): Promise<LotteryTicket[]> => {
     try {
-      const ticketsData = await AsyncStorage.getItem(STORAGE_KEYS.TICKETS);
-      if (!ticketsData) return [];
-
-      const allTickets: LotteryTicket[] = JSON.parse(ticketsData);
       const drawId = getCurrentDrawId();
       
-      return allTickets.filter(t => t.userId === userId && t.drawId === drawId);
+      const { data, error } = await supabase
+        .from('lottery_tickets')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('draw_id', drawId)
+        .order('ticket_number', { ascending: true });
+
+      if (error) {
+        console.error('Error getting user tickets:', error);
+        return [];
+      }
+
+      return (data || []).map(ticket => ({
+        id: ticket.ticket_id,
+        userId: ticket.user_id,
+        username: ticket.username,
+        uniqueIdentifier: ticket.unique_identifier,
+        purchaseDate: ticket.purchase_date,
+        drawId: ticket.draw_id,
+        ticketNumber: ticket.ticket_number,
+      }));
     } catch (error) {
       console.error('Error getting user tickets:', error);
       return [];
@@ -186,13 +280,42 @@ export const LotteryProvider = ({ children }: { children: ReactNode }) => {
 
   const getCurrentDraw = async (): Promise<LotteryDraw | null> => {
     try {
-      const drawsData = await AsyncStorage.getItem(STORAGE_KEYS.DRAWS);
-      if (!drawsData) return null;
-
-      const draws: LotteryDraw[] = JSON.parse(drawsData);
       const drawId = getCurrentDrawId();
       
-      return draws.find(d => d.id === drawId) || null;
+      const { data, error } = await supabase
+        .from('lottery_draws')
+        .select('*')
+        .eq('draw_id', drawId)
+        .single();
+
+      if (error || !data) {
+        return null;
+      }
+
+      // Get winners for this draw
+      const { data: winnersData } = await supabase
+        .from('lottery_winners')
+        .select('*')
+        .eq('draw_id', drawId)
+        .order('position', { ascending: true });
+
+      const winners: LotteryWinner[] = (winnersData || []).map(winner => ({
+        userId: winner.user_id,
+        username: winner.username,
+        uniqueIdentifier: winner.unique_identifier,
+        ticketId: winner.ticket_id,
+        prizeAmount: parseFloat(winner.prize_amount),
+        position: winner.position,
+      }));
+
+      return {
+        id: data.draw_id,
+        drawDate: data.draw_date,
+        totalTickets: data.total_tickets,
+        prizePool: parseFloat(data.prize_pool),
+        winners,
+        status: data.status,
+      };
     } catch (error) {
       console.error('Error getting current draw:', error);
       return null;
@@ -201,11 +324,46 @@ export const LotteryProvider = ({ children }: { children: ReactNode }) => {
 
   const getDrawHistory = async (): Promise<LotteryDraw[]> => {
     try {
-      const drawsData = await AsyncStorage.getItem(STORAGE_KEYS.DRAWS);
-      if (!drawsData) return [];
+      const { data, error } = await supabase
+        .from('lottery_draws')
+        .select('*')
+        .order('draw_date', { ascending: false })
+        .limit(20);
 
-      const draws: LotteryDraw[] = JSON.parse(drawsData);
-      return draws.sort((a, b) => new Date(b.drawDate).getTime() - new Date(a.drawDate).getTime());
+      if (error) {
+        console.error('Error getting draw history:', error);
+        return [];
+      }
+
+      const draws: LotteryDraw[] = [];
+
+      for (const draw of data || []) {
+        const { data: winnersData } = await supabase
+          .from('lottery_winners')
+          .select('*')
+          .eq('draw_id', draw.draw_id)
+          .order('position', { ascending: true });
+
+        const winners: LotteryWinner[] = (winnersData || []).map(winner => ({
+          userId: winner.user_id,
+          username: winner.username,
+          uniqueIdentifier: winner.unique_identifier,
+          ticketId: winner.ticket_id,
+          prizeAmount: parseFloat(winner.prize_amount),
+          position: winner.position,
+        }));
+
+        draws.push({
+          id: draw.draw_id,
+          drawDate: draw.draw_date,
+          totalTickets: draw.total_tickets,
+          prizePool: parseFloat(draw.prize_pool),
+          winners,
+          status: draw.status,
+        });
+      }
+
+      return draws;
     } catch (error) {
       console.error('Error getting draw history:', error);
       return [];
@@ -214,9 +372,19 @@ export const LotteryProvider = ({ children }: { children: ReactNode }) => {
 
   const getCurrentPrizePool = async (): Promise<number> => {
     try {
-      const totalTickets = await getTotalTicketsSold();
-      const totalRevenue = totalTickets * config.ticketPrice;
-      return totalRevenue * (config.prizePoolPercentage / 100);
+      const drawId = getCurrentDrawId();
+      
+      const { data, error } = await supabase
+        .from('lottery_draws')
+        .select('prize_pool')
+        .eq('draw_id', drawId)
+        .single();
+
+      if (error || !data) {
+        return 0;
+      }
+
+      return parseFloat(data.prize_pool);
     } catch (error) {
       console.error('Error calculating prize pool:', error);
       return 0;
@@ -225,13 +393,19 @@ export const LotteryProvider = ({ children }: { children: ReactNode }) => {
 
   const getTotalTicketsSold = async (): Promise<number> => {
     try {
-      const ticketsData = await AsyncStorage.getItem(STORAGE_KEYS.TICKETS);
-      if (!ticketsData) return 0;
-
-      const allTickets: LotteryTicket[] = JSON.parse(ticketsData);
       const drawId = getCurrentDrawId();
       
-      return allTickets.filter(t => t.drawId === drawId).length;
+      const { count, error } = await supabase
+        .from('lottery_tickets')
+        .select('*', { count: 'exact', head: true })
+        .eq('draw_id', drawId);
+
+      if (error) {
+        console.error('Error getting total tickets sold:', error);
+        return 0;
+      }
+
+      return count || 0;
     } catch (error) {
       console.error('Error getting total tickets sold:', error);
       return 0;
