@@ -29,13 +29,10 @@ import Animated, {
 
 export default function HomeScreen() {
   const theme = useTheme();
-  const { user, updateBalance, refreshUser } = useAuth();
+  const { user, refreshUser } = useAuth();
   const { config } = useMiningConfig();
   const { t } = useLocalization();
-  const { mxiRate, isConnected, connectToBinance, convertMXIToUSD } = useBinance();
-  const [isMining, setIsMining] = useState(false);
-  const [miningProgress, setMiningProgress] = useState(0);
-  const [minedAmount, setMinedAmount] = useState(0);
+  const { mxiRate, isConnected, convertMXIToUSD } = useBinance();
 
   // Animation values
   const rotation = useSharedValue(0);
@@ -48,102 +45,25 @@ export default function HomeScreen() {
     }
   }, [user]);
 
-  // Start rotation animation when mining
+  // Continuous rotation animation for the coin icon
   useEffect(() => {
-    if (isMining) {
-      rotation.value = withRepeat(
-        withTiming(360, {
-          duration: 2000,
-          easing: Easing.linear,
-        }),
-        -1,
-        false
-      );
-      scale.value = withRepeat(
-        withTiming(1.1, {
-          duration: 1000,
-          easing: Easing.inOut(Easing.ease),
-        }),
-        -1,
-        true
-      );
-    } else {
-      rotation.value = withTiming(0);
-      scale.value = withTiming(1);
-    }
-  }, [isMining, rotation, scale]);
+    rotation.value = withRepeat(
+      withTiming(360, {
+        duration: 3000,
+        easing: Easing.linear,
+      }),
+      -1,
+      false
+    );
+  }, [rotation]);
 
   const animatedStyle = useAnimatedStyle(() => {
     return {
       transform: [
         { rotate: `${rotation.value}deg` },
-        { scale: scale.value },
       ],
     };
   });
-
-  // Mining timer - configurable MXI per minute
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    
-    if (isMining && user) {
-      interval = setInterval(() => {
-        // Update every second, mining rate from config
-        const miningRate = config.miningRatePerMinute * user.miningPower; // MXI per minute
-        const incrementPerSecond = miningRate / 60; // MXI per second
-        
-        setMinedAmount(prev => {
-          const newAmount = prev + incrementPerSecond;
-          return newAmount;
-        });
-        
-        // Update progress (arbitrary scale for visual feedback)
-        setMiningProgress(prev => {
-          const newProgress = (prev + 0.1) % 100;
-          return newProgress;
-        });
-      }, 1000);
-    }
-
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [isMining, user, config.miningRatePerMinute]);
-
-  const startMining = () => {
-    if (!isMining) {
-      setIsMining(true);
-      setMinedAmount(0);
-      setMiningProgress(0);
-      console.log(`Mining started - Rate: ${config.miningRatePerMinute} MXI per minute`);
-    }
-  };
-
-  const stopMining = () => {
-    if (isMining && minedAmount > 0) {
-      updateBalance(minedAmount);
-      Alert.alert(
-        t('home.miningStopped'),
-        t('home.miningStoppedMessage', { amount: minedAmount.toFixed(6) }),
-        [{ text: t('common.ok') }]
-      );
-    }
-    setIsMining(false);
-    setMinedAmount(0);
-    setMiningProgress(0);
-    console.log("Mining stopped");
-  };
-
-  const handleConnectBinance = async () => {
-    if (!isConnected) {
-      await connectToBinance();
-      Alert.alert(
-        t('home.binanceConnected'),
-        t('home.binanceConnectedMessage'),
-        [{ text: t('common.ok') }]
-      );
-    }
-  };
 
   const formatMiningRate = () => {
     if (!user) return "0.0000";
@@ -181,14 +101,14 @@ export default function HomeScreen() {
           Platform.OS !== 'ios' && styles.scrollContentWithTabBar
         ]}
       >
-        {/* Mining Status Card */}
+        {/* Balance Card */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <Animated.View style={animatedStyle}>
               <IconSymbol 
                 name="bitcoinsign.circle.fill" 
                 size={80} 
-                color={isMining ? colors.accent : colors.primary} 
+                color={colors.primary} 
               />
             </Animated.View>
           </View>
@@ -217,128 +137,76 @@ export default function HomeScreen() {
           <PriceChart />
         </View>
 
-        {/* Mining Progress Card */}
+        {/* Quick Actions Card */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>{t('home.miningProgress')}</Text>
+          <Text style={styles.cardTitle}>Quick Actions</Text>
           
-          <View style={styles.miningStatsContainer}>
-            <View style={styles.miningStatBox}>
-              <IconSymbol name="clock.fill" size={24} color={colors.primary} />
-              <Text style={styles.miningStatValue}>
-                {isMining ? minedAmount.toFixed(6) : '0.000000'}
-              </Text>
-              <Text style={styles.miningStatLabel}>{t('home.minedThisSession')}</Text>
-            </View>
-          </View>
+          <View style={styles.actionGrid}>
+            <Pressable 
+              style={styles.actionButton}
+              onPress={() => router.push('/mining-panel')}
+            >
+              <IconSymbol name="hammer.fill" size={32} color={colors.primary} />
+              <Text style={styles.actionButtonText}>Mining Panel</Text>
+            </Pressable>
 
-          <View style={styles.progressBarContainer}>
-            <View 
-              style={[
-                styles.progressBar, 
-                { width: `${miningProgress}%` }
-              ]} 
-            />
-          </View>
-          
-          <View style={styles.miningInfo}>
-            <View style={styles.infoRow}>
-              <IconSymbol name="gauge" size={20} color={colors.textSecondary} />
-              <Text style={styles.infoText}>
-                {t('home.status')}: {isMining ? t('home.miningActive') : t('home.idle')}
-              </Text>
-            </View>
-            
-            <View style={styles.infoRow}>
-              <IconSymbol name="chart.bar.fill" size={20} color={colors.textSecondary} />
-              <Text style={styles.infoText}>
-                {t('home.rate')}: {formatMiningRate()} MXI {t('home.perMinute')}
-              </Text>
-            </View>
-          </View>
+            <Pressable 
+              style={styles.actionButton}
+              onPress={() => router.push('/transactions')}
+            >
+              <IconSymbol name="list.bullet.rectangle" size={32} color={colors.accent} />
+              <Text style={styles.actionButtonText}>Transactions</Text>
+            </Pressable>
 
-          {/* Mining Controls */}
-          <View style={styles.buttonGroup}>
-            {!isMining ? (
-              <Pressable 
-                style={[styles.button, styles.primaryButton]}
-                onPress={startMining}
-              >
-                <IconSymbol name="play.fill" size={20} color="#ffffff" />
-                <Text style={styles.buttonText}>{t('home.startMining')}</Text>
-              </Pressable>
-            ) : (
-              <Pressable 
-                style={[styles.button, styles.dangerButton]}
-                onPress={stopMining}
-              >
-                <IconSymbol name="stop.fill" size={20} color="#ffffff" />
-                <Text style={styles.buttonText}>{t('home.stopMining')}</Text>
-              </Pressable>
-            )}
+            <Pressable 
+              style={styles.actionButton}
+              onPress={() => router.push('/send-mxi')}
+            >
+              <IconSymbol name="paperplane.fill" size={32} color={colors.success} />
+              <Text style={styles.actionButtonText}>Send MXI</Text>
+            </Pressable>
+
+            <Pressable 
+              style={styles.actionButton}
+              onPress={() => router.push('/mxilucky')}
+            >
+              <IconSymbol name="gift.fill" size={32} color={colors.warning} />
+              <Text style={styles.actionButtonText}>MXILUCKY</Text>
+            </Pressable>
           </View>
         </View>
 
-        {/* Purchase Card - Updated with new quick options */}
+        {/* Mining Info Card */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>{t('home.purchaseMaxcoin')}</Text>
-          <Text style={styles.cardSubtitle}>
-            {t('home.increaseMiningPower')}
-          </Text>
+          <Text style={styles.cardTitle}>Mining Information</Text>
           
-          <View style={styles.purchaseGrid}>
-            <Pressable 
-              style={styles.purchaseButton}
-              onPress={() => router.push('/purchase?amount=0.02')}
-            >
-              <IconSymbol name="plus.circle.fill" size={32} color={colors.primary} />
-              <Text style={styles.purchaseAmount}>0.02 MXI</Text>
-              <Text style={styles.purchaseBonus}>
-                +{((0.02 / config.powerIncreaseThreshold) * config.powerIncreasePercent).toFixed(3)}% {t('home.power')}
-              </Text>
-            </Pressable>
+          <View style={styles.infoRow}>
+            <IconSymbol name="gauge" size={20} color={colors.textSecondary} />
+            <Text style={styles.infoText}>
+              {t('home.rate')}: {formatMiningRate()} MXI {t('home.perMinute')}
+            </Text>
+          </View>
 
-            <Pressable 
-              style={styles.purchaseButton}
-              onPress={() => router.push('/purchase?amount=0.2')}
-            >
-              <IconSymbol name="plus.circle.fill" size={32} color={colors.primary} />
-              <Text style={styles.purchaseAmount}>0.2 MXI</Text>
-              <Text style={styles.purchaseBonus}>
-                +{((0.2 / config.powerIncreaseThreshold) * config.powerIncreasePercent).toFixed(3)}% {t('home.power')}
-              </Text>
-            </Pressable>
+          <View style={styles.infoRow}>
+            <IconSymbol name="calendar" size={20} color={colors.textSecondary} />
+            <Text style={styles.infoText}>
+              Mining power rental: 30 days
+            </Text>
+          </View>
 
-            <Pressable 
-              style={styles.purchaseButton}
-              onPress={() => router.push('/purchase?amount=2.0')}
-            >
-              <IconSymbol name="plus.circle.fill" size={32} color={colors.accent} />
-              <Text style={styles.purchaseAmount}>2.0 MXI</Text>
-              <Text style={styles.purchaseBonus}>
-                +{((2.0 / config.powerIncreaseThreshold) * config.powerIncreasePercent).toFixed(2)}% {t('home.power')}
-              </Text>
-            </Pressable>
-
-            <Pressable 
-              style={styles.purchaseButton}
-              onPress={() => router.push('/purchase?amount=200')}
-            >
-              <IconSymbol name="plus.circle.fill" size={32} color={colors.success} />
-              <Text style={styles.purchaseAmount}>200 MXI</Text>
-              <Text style={styles.purchaseBonus}>
-                +{((200 / config.powerIncreaseThreshold) * config.powerIncreasePercent).toFixed(1)}% {t('home.power')}
-              </Text>
-            </Pressable>
+          <View style={styles.infoRow}>
+            <IconSymbol name="info.circle" size={20} color={colors.textSecondary} />
+            <Text style={styles.infoText}>
+              Access the Mining Panel to start earning
+            </Text>
           </View>
 
           <Pressable 
-            style={[styles.button, styles.accentButton, { marginTop: 12 }]}
-            onPress={() => router.push('/purchase')}
+            style={[styles.button, styles.primaryButton, { marginTop: 12 }]}
+            onPress={() => router.push('/mining-panel')}
           >
-            <IconSymbol name="pencil.circle.fill" size={20} color={colors.text} />
-            <Text style={[styles.buttonText, { color: colors.text }]}>
-              {t('home.customAmount')} ({config.minPurchase}-{config.maxPurchase} MXI)
-            </Text>
+            <IconSymbol name="arrow.right.circle.fill" size={20} color="#ffffff" />
+            <Text style={styles.buttonText}>Go to Mining Panel</Text>
           </Pressable>
         </View>
 
@@ -376,61 +244,6 @@ export default function HomeScreen() {
               })}
             </Text>
           </View>
-        </View>
-
-        {/* Binance Integration Card */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>{t('home.binanceIntegration')}</Text>
-          
-          <View style={styles.binanceStatus}>
-            <IconSymbol 
-              name={isConnected ? "checkmark.circle.fill" : "xmark.circle.fill"} 
-              size={24} 
-              color={isConnected ? colors.success : colors.textSecondary} 
-            />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.statusText}>
-                {isConnected ? t('home.connected') : t('home.notConnected')}
-              </Text>
-              {isConnected && mxiRate && (
-                <Text style={styles.statusSubtext}>
-                  1 MXI = ${mxiRate.price.toFixed(2)} USD
-                </Text>
-              )}
-            </View>
-          </View>
-
-          {!isConnected && (
-            <Pressable 
-              style={[styles.button, styles.accentButton]}
-              onPress={handleConnectBinance}
-            >
-              <IconSymbol name="link" size={20} color={colors.text} />
-              <Text style={[styles.buttonText, { color: colors.text }]}>
-                {t('home.connectToBinance')}
-              </Text>
-            </Pressable>
-          )}
-
-          {isConnected && (
-            <View style={styles.buttonGroup}>
-              <Pressable 
-                style={[styles.button, styles.primaryButton]}
-                onPress={() => router.push("/send-mxi")}
-              >
-                <IconSymbol name="paperplane.fill" size={20} color="#ffffff" />
-                <Text style={styles.buttonText}>Send MXI</Text>
-              </Pressable>
-              
-              <Pressable 
-                style={[styles.button, styles.secondaryButton]}
-                onPress={() => router.push("/formsheet")}
-              >
-                <IconSymbol name="arrow.up.circle.fill" size={20} color="#ffffff" />
-                <Text style={styles.buttonText}>{t('home.withdrawMXI')}</Text>
-              </Pressable>
-            </View>
-          )}
         </View>
 
         {/* Info Card */}
@@ -514,49 +327,25 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.text,
   },
-  miningStatsContainer: {
-    marginBottom: 16,
-  },
-  miningStatBox: {
-    backgroundColor: colors.background,
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-    gap: 8,
-  },
-  miningStatValue: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: colors.accent,
-  },
-  miningStatLabel: {
-    fontSize: 12,
-    color: colors.textSecondary,
-  },
-  purchaseGrid: {
+  actionGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 12,
-    marginBottom: 8,
   },
-  purchaseButton: {
+  actionButton: {
     flex: 1,
     minWidth: '45%',
     backgroundColor: colors.background,
     borderRadius: 12,
-    padding: 16,
+    padding: 20,
     alignItems: 'center',
     gap: 8,
   },
-  purchaseAmount: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.text,
-  },
-  purchaseBonus: {
-    fontSize: 11,
-    color: colors.success,
+  actionButtonText: {
+    fontSize: 14,
     fontWeight: '600',
+    color: colors.text,
+    textAlign: 'center',
   },
   referralCodeBox: {
     backgroundColor: colors.background,
@@ -618,34 +407,17 @@ const styles = StyleSheet.create({
     color: colors.text,
     lineHeight: 18,
   },
-  progressBarContainer: {
-    height: 12,
-    backgroundColor: colors.background,
-    borderRadius: 6,
-    overflow: 'hidden',
-    marginBottom: 16,
-  },
-  progressBar: {
-    height: '100%',
-    backgroundColor: colors.accent,
-    borderRadius: 6,
-  },
-  miningInfo: {
-    gap: 12,
-    marginBottom: 16,
-  },
   infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+    marginBottom: 12,
   },
   infoText: {
     fontSize: 15,
     color: colors.text,
     fontWeight: '500',
-  },
-  buttonGroup: {
-    gap: 10,
+    flex: 1,
   },
   button: {
     flexDirection: 'row',
@@ -659,38 +431,10 @@ const styles = StyleSheet.create({
   primaryButton: {
     backgroundColor: colors.primary,
   },
-  secondaryButton: {
-    backgroundColor: colors.secondary,
-  },
-  accentButton: {
-    backgroundColor: colors.accent,
-  },
-  dangerButton: {
-    backgroundColor: colors.danger,
-  },
   buttonText: {
     fontSize: 16,
     fontWeight: '600',
     color: '#ffffff',
-  },
-  binanceStatus: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 16,
-    padding: 12,
-    backgroundColor: colors.background,
-    borderRadius: 8,
-  },
-  statusText: {
-    fontSize: 15,
-    fontWeight: '500',
-    color: colors.text,
-  },
-  statusSubtext: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    marginTop: 2,
   },
   infoCard: {
     flexDirection: 'row',

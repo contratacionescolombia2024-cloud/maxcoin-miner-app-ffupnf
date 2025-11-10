@@ -142,13 +142,13 @@ export default function MiningPanelScreen() {
             <View style={styles.requirementBox}>
               <Text style={styles.requirementTitle}>Requirements:</Text>
               <Text style={styles.requirementText}>
-                • First purchase: 100 USDT minimum
+                - First purchase: 100 USDT minimum
               </Text>
               <Text style={styles.requirementText}>
-                • This unlocks both Mining and Lottery features
+                - This unlocks both Mining and Lottery features
               </Text>
               <Text style={styles.requirementText}>
-                • After unlocking, you can purchase the mining package
+                - After unlocking, you can purchase the mining package
               </Text>
             </View>
 
@@ -199,6 +199,10 @@ export default function MiningPanelScreen() {
                 <Text style={styles.statusValue}>{daysRemaining} days</Text>
               </View>
               <View style={styles.statusRow}>
+                <Text style={styles.statusLabel}>Rental Period:</Text>
+                <Text style={styles.statusValue}>30 days</Text>
+              </View>
+              <View style={styles.statusRow}>
                 <Text style={styles.statusLabel}>Renewals:</Text>
                 <Text style={styles.statusValue}>{miningAccess?.renewalCount || 0}</Text>
               </View>
@@ -206,14 +210,14 @@ export default function MiningPanelScreen() {
               {daysRemaining <= 7 && (
                 <Pressable style={styles.renewButton} onPress={handleRenewAccess}>
                   <IconSymbol name="arrow.clockwise" size={20} color={colors.background} />
-                  <Text style={styles.renewButtonText}>Renew Access</Text>
+                  <Text style={styles.renewButtonText}>Renew Access (30 days)</Text>
                 </Pressable>
               )}
             </>
           ) : (
             <>
               <Text style={styles.noAccessText}>
-                You need to purchase the initial mining package (100 USDT) to start earning MXI through mining.
+                Purchase the initial mining package (100 USDT) to start earning MXI through mining. Mining power is rented for 30 days and can be renewed.
               </Text>
               <View style={styles.costInfo}>
                 <Text style={styles.costLabel}>Access Cost:</Text>
@@ -230,6 +234,33 @@ export default function MiningPanelScreen() {
               </Pressable>
             </>
           )}
+        </View>
+
+        {/* Buy Maxcoin Card - Moved from home screen */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <IconSymbol name="cart.fill" size={32} color={colors.accent} />
+            <Text style={styles.cardTitle}>Buy Maxcoin (MXI)</Text>
+          </View>
+          
+          <Text style={styles.cardDescription}>
+            Increase your mining power by purchasing MXI. Mining power rental is valid for 30 days from purchase.
+          </Text>
+
+          <View style={styles.infoBox}>
+            <IconSymbol name="info.circle.fill" size={20} color={colors.primary} />
+            <Text style={styles.infoBoxText}>
+              Each purchase increases your mining power, allowing you to mine more MXI per minute during your active rental period.
+            </Text>
+          </View>
+
+          <Pressable 
+            style={styles.buyButton} 
+            onPress={() => router.push('/purchase')}
+          >
+            <IconSymbol name="plus.circle.fill" size={20} color={colors.background} />
+            <Text style={styles.buyButtonText}>Purchase MXI</Text>
+          </Pressable>
         </View>
 
         {/* Mining Metrics Card */}
@@ -364,13 +395,16 @@ export default function MiningPanelScreen() {
             <View style={styles.requirementsBox}>
               <Text style={styles.requirementsTitle}>Requirements to withdraw mining earnings:</Text>
               <Text style={styles.requirementText}>
-                • 10 active referrals with purchases per cycle
+                - 10 active referrals with purchases per cycle
               </Text>
               <Text style={styles.requirementText}>
-                • Purchases include initial package (100 USDT) or mining power
+                - Purchases include initial package (100 USDT) or mining power
               </Text>
               <Text style={styles.requirementText}>
-                • Current progress: {referralMetrics.active}/10 active referrals
+                - Current progress: {referralMetrics.active}/10 active referrals
+              </Text>
+              <Text style={styles.requirementText}>
+                - This applies to the first 5 withdrawals
               </Text>
             </View>
           )}
@@ -506,6 +540,12 @@ const styles = StyleSheet.create({
     color: colors.text,
     marginLeft: 12,
   },
+  cardDescription: {
+    fontSize: 15,
+    color: colors.textSecondary,
+    lineHeight: 22,
+    marginBottom: 16,
+  },
   statusRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -570,6 +610,35 @@ const styles = StyleSheet.create({
     color: colors.background,
     fontSize: 15,
     fontWeight: '600',
+    marginLeft: 8,
+  },
+  infoBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.highlight,
+    borderRadius: 8,
+    padding: 12,
+    gap: 10,
+    marginBottom: 16,
+  },
+  infoBoxText: {
+    flex: 1,
+    fontSize: 13,
+    color: colors.text,
+    lineHeight: 18,
+  },
+  buyButton: {
+    backgroundColor: colors.accent,
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  buyButtonText: {
+    color: colors.background,
+    fontSize: 16,
+    fontWeight: '700',
     marginLeft: 8,
   },
   metricRow: {
