@@ -7,24 +7,12 @@ import {
   ScrollView,
   Pressable,
   Alert,
-  Linking,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocalization } from '@/contexts/LocalizationContext';
 import { colors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
-
-type PaymentMethod = 'binance' | 'coinbase' | 'skrill' | 'paypal';
-
-interface PaymentMethodOption {
-  id: PaymentMethod;
-  name: string;
-  icon: string;
-  description: string;
-  color: string;
-  available: boolean;
-}
 
 export default function PaymentMethodsScreen() {
   const { purchaseMaxcoin, recordFirstPurchase } = useAuth();
@@ -33,79 +21,29 @@ export default function PaymentMethodsScreen() {
   const amount = parseFloat(params.amount as string) || 0;
   const usdValue = parseFloat(params.usdValue as string) || 0;
   
-  const [selectedMethod, setSelectedMethod] = useState<PaymentMethod | null>(null);
   const [processing, setProcessing] = useState(false);
 
-  const paymentMethods: PaymentMethodOption[] = [
-    {
-      id: 'binance',
-      name: 'Binance Pay',
-      icon: 'bitcoinsign.circle.fill',
-      description: 'Pay with Binance (Recommended)',
-      color: '#F3BA2F',
-      available: true,
-    },
-    {
-      id: 'coinbase',
-      name: 'Coinbase',
-      icon: 'dollarsign.circle.fill',
-      description: 'Pay with Coinbase',
-      color: '#0052FF',
-      available: false,
-    },
-    {
-      id: 'skrill',
-      name: 'Skrill',
-      icon: 'creditcard.fill',
-      description: 'Pay with Skrill',
-      color: '#862165',
-      available: false,
-    },
-    {
-      id: 'paypal',
-      name: 'PayPal',
-      icon: 'p.circle.fill',
-      description: 'Pay with PayPal',
-      color: '#003087',
-      available: false,
-    },
-  ];
-
-  const handlePaymentMethodSelect = (method: PaymentMethod) => {
-    if (!paymentMethods.find(m => m.id === method)?.available) {
-      Alert.alert('Coming Soon', 'This payment method will be available soon.');
-      return;
-    }
-    setSelectedMethod(method);
-  };
-
   const handleProceedToPayment = async () => {
-    if (!selectedMethod) {
-      Alert.alert('Error', 'Please select a payment method');
-      return;
-    }
-
-    switch (selectedMethod) {
-      case 'binance':
-        await processBinancePayment();
-        break;
-      case 'coinbase':
-        await processCoinbasePayment();
-        break;
-      case 'skrill':
-        await processSkrillPayment();
-        break;
-      case 'paypal':
-        await processPayPalPayment();
-        break;
-    }
+    Alert.alert(
+      'Confirm Purchase',
+      `You are about to purchase ${amount.toFixed(6)} MXI for $${usdValue.toFixed(2)} USDT via Binance Pay.\n\nProceed with payment?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Confirm',
+          onPress: async () => {
+            await processBinancePayment();
+          },
+        },
+      ]
+    );
   };
 
   const processBinancePayment = async () => {
     setProcessing(true);
     
     try {
-      // Simulate payment processing
+      // Simulate Binance payment processing
       await new Promise(resolve => setTimeout(resolve, 2000));
       
       // Complete the purchase
@@ -132,18 +70,6 @@ export default function PaymentMethodsScreen() {
     }
   };
 
-  const processCoinbasePayment = async () => {
-    Alert.alert('Coming Soon', 'Coinbase integration will be available soon.');
-  };
-
-  const processSkrillPayment = async () => {
-    Alert.alert('Coming Soon', 'Skrill integration will be available soon.');
-  };
-
-  const processPayPalPayment = async () => {
-    Alert.alert('Coming Soon', 'PayPal integration will be available soon.');
-  };
-
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -157,19 +83,20 @@ export default function PaymentMethodsScreen() {
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Purchase Summary */}
         <View style={styles.summaryCard}>
-          <Text style={styles.summaryTitle}>Purchase Summary</Text>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Amount (MXI):</Text>
-            <Text style={styles.summaryValue}>{amount.toFixed(6)} MXI</Text>
+          <View style={styles.iconContainer}>
+            <IconSymbol name="cart.fill" size={64} color={colors.accent} />
           </View>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Total (USD):</Text>
-            <Text style={styles.summaryValue}>${usdValue.toFixed(2)}</Text>
+          
+          <Text style={styles.summaryTitle}>Purchase Summary</Text>
+          
+          <View style={styles.amountDisplay}>
+            <Text style={styles.amountMXI}>{amount.toFixed(6)} MXI</Text>
+            <Text style={styles.amountUSD}>${usdValue.toFixed(2)} USDT</Text>
           </View>
           
           {usdValue >= 100 && (
             <View style={styles.unlockNotice}>
-              <IconSymbol name="star.fill" size={20} color="#FFD700" />
+              <IconSymbol name="star.fill" size={24} color="#FFD700" />
               <Text style={styles.unlockNoticeText}>
                 This purchase will unlock Mining and Lottery features!
               </Text>
@@ -177,45 +104,45 @@ export default function PaymentMethodsScreen() {
           )}
         </View>
 
-        {/* Payment Methods */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Select Payment Method</Text>
+        {/* Payment Method Card */}
+        <View style={styles.paymentCard}>
+          <Text style={styles.sectionTitle}>Payment Method</Text>
           
-          {paymentMethods.map((method) => (
-            <Pressable
-              key={method.id}
-              style={[
-                styles.methodCard,
-                selectedMethod === method.id && styles.methodCardSelected,
-                !method.available && styles.methodCardDisabled,
-              ]}
-              onPress={() => handlePaymentMethodSelect(method.id)}
-              disabled={!method.available}
-            >
-              <View style={styles.methodIcon}>
-                <IconSymbol name={method.icon} size={32} color={method.color} />
+          <View style={styles.methodCard}>
+            <View style={styles.methodIcon}>
+              <IconSymbol name="bitcoinsign.circle.fill" size={48} color="#F3BA2F" />
+            </View>
+            
+            <View style={styles.methodInfo}>
+              <Text style={styles.methodName}>Binance Pay</Text>
+              <Text style={styles.methodDescription}>
+                Secure cryptocurrency payment via Binance
+              </Text>
+              <View style={styles.onlyMethodBadge}>
+                <Text style={styles.onlyMethodText}>ONLY AVAILABLE METHOD</Text>
               </View>
-              
-              <View style={styles.methodInfo}>
-                <Text style={styles.methodName}>{method.name}</Text>
-                <Text style={styles.methodDescription}>{method.description}</Text>
-                {!method.available && (
-                  <Text style={styles.comingSoon}>Coming Soon</Text>
-                )}
-              </View>
-              
-              {selectedMethod === method.id && (
-                <IconSymbol name="checkmark.circle.fill" size={24} color={colors.success} />
-              )}
-            </Pressable>
-          ))}
+            </View>
+            
+            <IconSymbol name="checkmark.circle.fill" size={32} color={colors.success} />
+          </View>
+
+          <View style={styles.infoBox}>
+            <IconSymbol name="info.circle.fill" size={20} color={colors.primary} />
+            <Text style={styles.infoBoxText}>
+              All payments are processed securely through Binance Pay. Other payment methods are not currently supported.
+            </Text>
+          </View>
         </View>
 
         {/* Important Notes */}
         <View style={styles.notesCard}>
-          <Text style={styles.notesTitle}>Important Notes:</Text>
+          <View style={styles.notesHeader}>
+            <IconSymbol name="exclamationmark.triangle.fill" size={24} color={colors.warning} />
+            <Text style={styles.notesTitle}>Important Information</Text>
+          </View>
+          
           <Text style={styles.noteText}>
-            • Only Binance integration is currently available
+            • Only Binance Pay is available for payments
           </Text>
           <Text style={styles.noteText}>
             • Purchased MXI can be withdrawn immediately
@@ -226,23 +153,32 @@ export default function PaymentMethodsScreen() {
           <Text style={styles.noteText}>
             • First purchase of 100 USDT unlocks Mining and Lottery
           </Text>
+          <Text style={styles.noteText}>
+            • Mining power increases with USDT purchases
+          </Text>
+          <Text style={styles.noteText}>
+            • All transactions are recorded in your history
+          </Text>
         </View>
 
         {/* Proceed Button */}
         <Pressable
           style={[
             styles.proceedButton,
-            (!selectedMethod || processing) && styles.proceedButtonDisabled,
+            processing && styles.proceedButtonDisabled,
           ]}
           onPress={handleProceedToPayment}
-          disabled={!selectedMethod || processing}
+          disabled={processing}
         >
           {processing ? (
-            <Text style={styles.proceedButtonText}>Processing...</Text>
+            <>
+              <IconSymbol name="hourglass" size={20} color={colors.background} />
+              <Text style={styles.proceedButtonText}>Processing Payment...</Text>
+            </>
           ) : (
             <>
               <IconSymbol name="arrow.right.circle.fill" size={20} color={colors.background} />
-              <Text style={styles.proceedButtonText}>Proceed to Payment</Text>
+              <Text style={styles.proceedButtonText}>Pay ${usdValue.toFixed(2)} USDT</Text>
             </>
           )}
         </Pressable>
@@ -286,32 +222,36 @@ const styles = StyleSheet.create({
   },
   summaryCard: {
     backgroundColor: colors.cardBackground,
-    borderRadius: 16,
-    padding: 20,
+    borderRadius: 20,
+    padding: 24,
     marginBottom: 20,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderWidth: 2,
+    borderColor: colors.accent,
+    alignItems: 'center',
   },
-  summaryTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.text,
+  iconContainer: {
     marginBottom: 16,
   },
-  summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  summaryLabel: {
-    fontSize: 15,
-    color: colors.textSecondary,
-  },
-  summaryValue: {
-    fontSize: 16,
-    fontWeight: '600',
+  summaryTitle: {
+    fontSize: 20,
+    fontWeight: '800',
     color: colors.text,
+    marginBottom: 20,
+  },
+  amountDisplay: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  amountMXI: {
+    fontSize: 32,
+    fontWeight: '900',
+    color: colors.text,
+    marginBottom: 8,
+  },
+  amountUSD: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: colors.primary,
   },
   unlockNotice: {
     flexDirection: 'row',
@@ -320,95 +260,124 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     marginTop: 12,
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: '#FFD700',
+    gap: 12,
   },
   unlockNoticeText: {
     fontSize: 14,
-    fontWeight: '600',
-    color: colors.text,
-    marginLeft: 12,
-    flex: 1,
-  },
-  section: {
-    marginBottom: 20,
-  },
-  sectionTitle: {
-    fontSize: 16,
     fontWeight: '700',
     color: colors.text,
-    marginBottom: 12,
+    flex: 1,
+  },
+  paymentCard: {
+    backgroundColor: colors.cardBackground,
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: 16,
   },
   methodCard: {
-    backgroundColor: colors.cardBackground,
+    backgroundColor: colors.background,
     borderRadius: 12,
     padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
     borderWidth: 2,
-    borderColor: colors.border,
-  },
-  methodCardSelected: {
-    borderColor: colors.primary,
-    backgroundColor: colors.background,
-  },
-  methodCardDisabled: {
-    opacity: 0.5,
+    borderColor: colors.success,
+    marginBottom: 16,
   },
   methodIcon: {
-    width: 48,
-    height: 48,
+    width: 64,
+    height: 64,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    marginRight: 16,
   },
   methodInfo: {
     flex: 1,
   },
   methodName: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 20,
+    fontWeight: '700',
     color: colors.text,
-    marginBottom: 4,
+    marginBottom: 6,
   },
   methodDescription: {
-    fontSize: 13,
+    fontSize: 14,
     color: colors.textSecondary,
+    marginBottom: 10,
   },
-  comingSoon: {
+  onlyMethodBadge: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+  },
+  onlyMethodText: {
     fontSize: 12,
-    color: colors.warning,
-    fontWeight: '600',
-    marginTop: 4,
+    fontWeight: '800',
+    color: colors.background,
+  },
+  infoBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.highlight,
+    borderRadius: 10,
+    padding: 14,
+    gap: 12,
+  },
+  infoBoxText: {
+    flex: 1,
+    fontSize: 13,
+    color: colors.text,
+    lineHeight: 19,
   },
   notesCard: {
     backgroundColor: colors.cardBackground,
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 16,
+    padding: 20,
     marginBottom: 20,
     borderWidth: 1,
     borderColor: colors.border,
   },
+  notesHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    gap: 10,
+  },
   notesTitle: {
-    fontSize: 15,
-    fontWeight: '600',
+    fontSize: 16,
+    fontWeight: '700',
     color: colors.text,
-    marginBottom: 12,
   },
   noteText: {
-    fontSize: 13,
+    fontSize: 14,
     color: colors.textSecondary,
-    lineHeight: 20,
-    marginBottom: 4,
+    lineHeight: 22,
+    marginBottom: 8,
   },
   proceedButton: {
     backgroundColor: colors.primary,
-    borderRadius: 12,
-    padding: 18,
+    borderRadius: 16,
+    padding: 20,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
   proceedButtonDisabled: {
     backgroundColor: colors.textSecondary,
@@ -416,8 +385,8 @@ const styles = StyleSheet.create({
   },
   proceedButtonText: {
     color: colors.background,
-    fontSize: 16,
-    fontWeight: '700',
-    marginLeft: 8,
+    fontSize: 18,
+    fontWeight: '800',
+    marginLeft: 10,
   },
 });

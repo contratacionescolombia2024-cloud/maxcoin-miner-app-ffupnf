@@ -15,17 +15,6 @@ import { useBinance } from '@/contexts/BinanceContext';
 import { colors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 
-type PaymentMethod = 'binance' | 'coinbase' | 'skrill' | 'paypal';
-
-interface PaymentMethodOption {
-  id: PaymentMethod;
-  name: string;
-  icon: string;
-  description: string;
-  color: string;
-  available: boolean;
-}
-
 export default function MiningAccessPurchaseScreen() {
   const { user } = useAuth();
   const { purchaseMiningAccess, renewMiningAccess, getMiningAccessCost } = useMiningAccess();
@@ -33,93 +22,64 @@ export default function MiningAccessPurchaseScreen() {
   const params = useLocalSearchParams();
   const isRenewal = params.renewal === 'true';
   
-  const [selectedMethod, setSelectedMethod] = useState<PaymentMethod | null>(null);
   const [processing, setProcessing] = useState(false);
 
   const accessCost = getMiningAccessCost();
   const mxiEquivalent = mxiPrice > 0 ? accessCost / mxiPrice : 0;
 
-  const paymentMethods: PaymentMethodOption[] = [
-    {
-      id: 'binance',
-      name: 'Binance Pay',
-      icon: 'bitcoinsign.circle.fill',
-      description: 'Pay with Binance (Recommended)',
-      color: '#F3BA2F',
-      available: true,
-    },
-    {
-      id: 'coinbase',
-      name: 'Coinbase',
-      icon: 'dollarsign.circle.fill',
-      description: 'Pay with Coinbase',
-      color: '#0052FF',
-      available: false,
-    },
-    {
-      id: 'skrill',
-      name: 'Skrill',
-      icon: 'creditcard.fill',
-      description: 'Pay with Skrill',
-      color: '#862165',
-      available: false,
-    },
-    {
-      id: 'paypal',
-      name: 'PayPal',
-      icon: 'p.circle.fill',
-      description: 'Pay with PayPal',
-      color: '#003087',
-      available: false,
-    },
-  ];
-
   const handlePurchase = async () => {
-    if (!selectedMethod) {
-      Alert.alert('Error', 'Please select a payment method');
-      return;
-    }
-
     if (!user) {
       Alert.alert('Error', 'User not authenticated');
       return;
     }
 
-    setProcessing(true);
+    Alert.alert(
+      'Confirm Purchase',
+      `You are about to ${isRenewal ? 'renew' : 'purchase'} mining access for ${accessCost} USDT via Binance Pay.\n\nDuration: 30 days\n\nProceed with payment?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Confirm',
+          onPress: async () => {
+            setProcessing(true);
 
-    try {
-      // Simulate payment processing
-      await new Promise(resolve => setTimeout(resolve, 2000));
+            try {
+              // Simulate Binance payment processing
+              await new Promise(resolve => setTimeout(resolve, 2000));
 
-      let result;
-      if (isRenewal) {
-        result = await renewMiningAccess(user.id);
-      } else {
-        result = await purchaseMiningAccess(user.id, selectedMethod);
-      }
+              let result;
+              if (isRenewal) {
+                result = await renewMiningAccess(user.id);
+              } else {
+                result = await purchaseMiningAccess(user.id, 'binance');
+              }
 
-      if (result.success) {
-        Alert.alert(
-          'Success',
-          isRenewal 
-            ? 'Mining access renewed successfully! Your access has been extended for 30 days.'
-            : 'Mining access purchased successfully! You can now start mining MXI.',
-          [
-            {
-              text: 'OK',
-              onPress: () => router.replace('/mining-panel'),
-            },
-          ]
-        );
-      } else {
-        Alert.alert('Error', result.message || 'Purchase failed');
-      }
-    } catch (error) {
-      console.error('Error purchasing mining access:', error);
-      Alert.alert('Error', 'Failed to process payment');
-    } finally {
-      setProcessing(false);
-    }
+              if (result.success) {
+                Alert.alert(
+                  'Success',
+                  isRenewal 
+                    ? 'Mining access renewed successfully! Your access has been extended for 30 days.'
+                    : 'Mining access purchased successfully! You can now start mining MXI.',
+                  [
+                    {
+                      text: 'OK',
+                      onPress: () => router.replace('/mining-panel'),
+                    },
+                  ]
+                );
+              } else {
+                Alert.alert('Error', result.message || 'Purchase failed');
+              }
+            } catch (error) {
+              console.error('Error purchasing mining access:', error);
+              Alert.alert('Error', 'Failed to process payment');
+            } finally {
+              setProcessing(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   return (
@@ -137,73 +97,91 @@ export default function MiningAccessPurchaseScreen() {
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Purchase Summary */}
         <View style={styles.summaryCard}>
+          <View style={styles.iconContainer}>
+            <IconSymbol name="lock.shield.fill" size={64} color={colors.primary} />
+          </View>
+          
           <Text style={styles.summaryTitle}>
-            {isRenewal ? 'Renewal Summary' : 'Purchase Summary'}
+            {isRenewal ? 'Renewal Summary' : 'Initial Mining Package'}
           </Text>
           
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Duration:</Text>
-            <Text style={styles.summaryValue}>30 Days</Text>
+          <View style={styles.costDisplay}>
+            <Text style={styles.costAmount}>{accessCost} USDT</Text>
+            <Text style={styles.costEquivalent}>≈ {mxiEquivalent.toFixed(2)} MXI</Text>
           </View>
-          
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Cost (USDT):</Text>
-            <Text style={styles.summaryValue}>{accessCost} USDT</Text>
+
+          <View style={styles.divider} />
+
+          <View style={styles.detailRow}>
+            <IconSymbol name="calendar" size={20} color={colors.accent} />
+            <Text style={styles.detailLabel}>Duration:</Text>
+            <Text style={styles.detailValue}>30 Days</Text>
           </View>
-          
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Cost (MXI):</Text>
-            <Text style={styles.summaryValue}>≈ {mxiEquivalent.toFixed(2)} MXI</Text>
+
+          <View style={styles.detailRow}>
+            <IconSymbol name="bitcoinsign.circle.fill" size={20} color="#F3BA2F" />
+            <Text style={styles.detailLabel}>Payment Method:</Text>
+            <Text style={styles.detailValue}>Binance Pay</Text>
           </View>
 
           <View style={styles.divider} />
 
           <View style={styles.benefitsBox}>
-            <Text style={styles.benefitsTitle}>Benefits:</Text>
-            <Text style={styles.benefitText}>✓ Earn MXI through mining</Text>
-            <Text style={styles.benefitText}>✓ Increase mining power with purchases</Text>
-            <Text style={styles.benefitText}>✓ Earn referral commissions</Text>
-            <Text style={styles.benefitText}>✓ Access to withdrawal system</Text>
+            <Text style={styles.benefitsTitle}>Package Benefits:</Text>
+            <View style={styles.benefitItem}>
+              <IconSymbol name="checkmark.circle.fill" size={18} color={colors.success} />
+              <Text style={styles.benefitText}>Earn MXI through mining (0.00002 MXI/min base rate)</Text>
+            </View>
+            <View style={styles.benefitItem}>
+              <IconSymbol name="checkmark.circle.fill" size={18} color={colors.success} />
+              <Text style={styles.benefitText}>Increase mining power with USDT purchases</Text>
+            </View>
+            <View style={styles.benefitItem}>
+              <IconSymbol name="checkmark.circle.fill" size={18} color={colors.success} />
+              <Text style={styles.benefitText}>Earn referral commissions (3-level system)</Text>
+            </View>
+            <View style={styles.benefitItem}>
+              <IconSymbol name="checkmark.circle.fill" size={18} color={colors.success} />
+              <Text style={styles.benefitText}>Access to withdrawal system</Text>
+            </View>
+            <View style={styles.benefitItem}>
+              <IconSymbol name="checkmark.circle.fill" size={18} color={colors.success} />
+              <Text style={styles.benefitText}>30-day mining power rental</Text>
+            </View>
           </View>
         </View>
 
-        {/* Payment Methods */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Select Payment Method</Text>
+        {/* Payment Method Card */}
+        <View style={styles.paymentCard}>
+          <Text style={styles.sectionTitle}>Payment Method</Text>
           
-          {paymentMethods.map((method) => (
-            <Pressable
-              key={method.id}
-              style={[
-                styles.methodCard,
-                selectedMethod === method.id && styles.methodCardSelected,
-                !method.available && styles.methodCardDisabled,
-              ]}
-              onPress={() => method.available && setSelectedMethod(method.id)}
-              disabled={!method.available}
-            >
-              <View style={styles.methodIcon}>
-                <IconSymbol name={method.icon} size={32} color={method.color} />
+          <View style={styles.methodCard}>
+            <View style={styles.methodIcon}>
+              <IconSymbol name="bitcoinsign.circle.fill" size={40} color="#F3BA2F" />
+            </View>
+            
+            <View style={styles.methodInfo}>
+              <Text style={styles.methodName}>Binance Pay</Text>
+              <Text style={styles.methodDescription}>Secure cryptocurrency payment via Binance</Text>
+              <View style={styles.recommendedBadge}>
+                <Text style={styles.recommendedText}>ONLY AVAILABLE METHOD</Text>
               </View>
-              
-              <View style={styles.methodInfo}>
-                <Text style={styles.methodName}>{method.name}</Text>
-                <Text style={styles.methodDescription}>{method.description}</Text>
-                {!method.available && (
-                  <Text style={styles.comingSoon}>Coming Soon</Text>
-                )}
-              </View>
-              
-              {selectedMethod === method.id && (
-                <IconSymbol name="checkmark.circle.fill" size={24} color={colors.success} />
-              )}
-            </Pressable>
-          ))}
+            </View>
+            
+            <IconSymbol name="checkmark.circle.fill" size={28} color={colors.success} />
+          </View>
         </View>
 
         {/* Important Notes */}
         <View style={styles.notesCard}>
-          <Text style={styles.notesTitle}>Important Notes:</Text>
+          <View style={styles.notesHeader}>
+            <IconSymbol name="info.circle.fill" size={24} color={colors.warning} />
+            <Text style={styles.notesTitle}>Important Information</Text>
+          </View>
+          
+          <Text style={styles.noteText}>
+            • Initial package cost is 100 USDT (paid via Binance)
+          </Text>
           <Text style={styles.noteText}>
             • Mining access is valid for 30 days from purchase date
           </Text>
@@ -211,13 +189,13 @@ export default function MiningAccessPurchaseScreen() {
             • You can renew your access before it expires
           </Text>
           <Text style={styles.noteText}>
-            • Commissions are paid at MXI/USDT exchange rate
+            • Mining power increases with additional USDT purchases
           </Text>
           <Text style={styles.noteText}>
-            • Only Binance integration is currently available
+            • All payments are processed through Binance Pay
           </Text>
           <Text style={styles.noteText}>
-            • Initial package cost is 100 USDT
+            • Commissions are paid at current MXI/USDT exchange rate
           </Text>
         </View>
 
@@ -225,18 +203,21 @@ export default function MiningAccessPurchaseScreen() {
         <Pressable
           style={[
             styles.purchaseButton,
-            (!selectedMethod || processing) && styles.purchaseButtonDisabled,
+            processing && styles.purchaseButtonDisabled,
           ]}
           onPress={handlePurchase}
-          disabled={!selectedMethod || processing}
+          disabled={processing}
         >
           {processing ? (
-            <Text style={styles.purchaseButtonText}>Processing...</Text>
+            <>
+              <IconSymbol name="hourglass" size={20} color={colors.background} />
+              <Text style={styles.purchaseButtonText}>Processing Payment...</Text>
+            </>
           ) : (
             <>
               <IconSymbol name="lock.shield.fill" size={20} color={colors.background} />
               <Text style={styles.purchaseButtonText}>
-                {isRenewal ? 'Renew Access' : 'Purchase Access'}
+                {isRenewal ? `Renew for ${accessCost} USDT` : `Purchase for ${accessCost} USDT`}
               </Text>
             </>
           )}
@@ -281,133 +262,177 @@ const styles = StyleSheet.create({
   },
   summaryCard: {
     backgroundColor: colors.cardBackground,
+    borderRadius: 20,
+    padding: 24,
+    marginBottom: 20,
+    borderWidth: 2,
+    borderColor: colors.primary,
+    alignItems: 'center',
+  },
+  iconContainer: {
+    marginBottom: 16,
+  },
+  summaryTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: colors.text,
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  costDisplay: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  costAmount: {
+    fontSize: 48,
+    fontWeight: '900',
+    color: colors.primary,
+    marginBottom: 8,
+  },
+  costEquivalent: {
+    fontSize: 16,
+    color: colors.textSecondary,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: colors.border,
+    width: '100%',
+    marginVertical: 20,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    marginBottom: 12,
+    gap: 12,
+  },
+  detailLabel: {
+    fontSize: 15,
+    color: colors.textSecondary,
+    flex: 1,
+  },
+  detailValue: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  benefitsBox: {
+    backgroundColor: colors.background,
+    borderRadius: 16,
+    padding: 20,
+    width: '100%',
+  },
+  benefitsTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: 16,
+  },
+  benefitItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+    gap: 10,
+  },
+  benefitText: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    lineHeight: 20,
+    flex: 1,
+  },
+  paymentCard: {
+    backgroundColor: colors.cardBackground,
     borderRadius: 16,
     padding: 20,
     marginBottom: 20,
     borderWidth: 1,
     borderColor: colors.border,
   },
-  summaryTitle: {
+  sectionTitle: {
     fontSize: 18,
     fontWeight: '700',
     color: colors.text,
     marginBottom: 16,
   },
-  summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  summaryLabel: {
-    fontSize: 15,
-    color: colors.textSecondary,
-  },
-  summaryValue: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: colors.border,
-    marginVertical: 16,
-  },
-  benefitsBox: {
-    backgroundColor: colors.background,
-    borderRadius: 12,
-    padding: 16,
-  },
-  benefitsTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: colors.text,
-    marginBottom: 12,
-  },
-  benefitText: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    lineHeight: 22,
-  },
-  section: {
-    marginBottom: 20,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.text,
-    marginBottom: 12,
-  },
   methodCard: {
-    backgroundColor: colors.cardBackground,
+    backgroundColor: colors.background,
     borderRadius: 12,
     padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
     borderWidth: 2,
-    borderColor: colors.border,
-  },
-  methodCardSelected: {
-    borderColor: colors.primary,
-    backgroundColor: colors.background,
-  },
-  methodCardDisabled: {
-    opacity: 0.5,
+    borderColor: colors.success,
   },
   methodIcon: {
-    width: 48,
-    height: 48,
+    width: 56,
+    height: 56,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    marginRight: 16,
   },
   methodInfo: {
     flex: 1,
   },
   methodName: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 18,
+    fontWeight: '700',
     color: colors.text,
     marginBottom: 4,
   },
   methodDescription: {
     fontSize: 13,
     color: colors.textSecondary,
+    marginBottom: 8,
   },
-  comingSoon: {
-    fontSize: 12,
-    color: colors.warning,
-    fontWeight: '600',
-    marginTop: 4,
+  recommendedBadge: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+  },
+  recommendedText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.background,
   },
   notesCard: {
     backgroundColor: colors.cardBackground,
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 16,
+    padding: 20,
     marginBottom: 20,
     borderWidth: 1,
     borderColor: colors.border,
   },
+  notesHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    gap: 10,
+  },
   notesTitle: {
-    fontSize: 15,
-    fontWeight: '600',
+    fontSize: 16,
+    fontWeight: '700',
     color: colors.text,
-    marginBottom: 12,
   },
   noteText: {
-    fontSize: 13,
+    fontSize: 14,
     color: colors.textSecondary,
-    lineHeight: 20,
-    marginBottom: 4,
+    lineHeight: 22,
+    marginBottom: 8,
   },
   purchaseButton: {
     backgroundColor: colors.primary,
-    borderRadius: 12,
-    padding: 18,
+    borderRadius: 16,
+    padding: 20,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
   purchaseButtonDisabled: {
     backgroundColor: colors.textSecondary,
@@ -415,8 +440,8 @@ const styles = StyleSheet.create({
   },
   purchaseButtonText: {
     color: colors.background,
-    fontSize: 16,
-    fontWeight: '700',
-    marginLeft: 8,
+    fontSize: 18,
+    fontWeight: '800',
+    marginLeft: 10,
   },
 });
