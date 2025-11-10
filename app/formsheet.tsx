@@ -33,7 +33,7 @@ const PLATFORMS: PlatformOption[] = [
 
 export default function FormSheetModal() {
   const { user, withdrawMXI, updateWithdrawalAddress, canWithdrawAmount, getActiveReferralsCount } = useAuth();
-  const { mxiPrice, isConnected } = useBinance();
+  const { mxiRate, isConnected, convertMXIToUSD } = useBinance();
   const [selectedPlatform, setSelectedPlatform] = useState<Platform>('binance');
   const [address, setAddress] = useState('');
   const [amount, setAmount] = useState('');
@@ -76,9 +76,11 @@ export default function FormSheetModal() {
       return;
     }
 
+    const usdValue = mxiRate ? convertMXIToUSD(withdrawAmount) : 0;
+
     Alert.alert(
       'Confirm Withdrawal',
-      `Withdraw ${withdrawAmount.toFixed(6)} MXI to ${selectedPlatform}?\n\nAddress: ${address}\n\nEstimated value: $${(withdrawAmount * mxiPrice).toFixed(2)} USD`,
+      `Withdraw ${withdrawAmount.toFixed(6)} MXI via ${selectedPlatform}?\n\nAddress: ${address}\n\nEstimated value: $${usdValue.toFixed(2)} USD`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -95,7 +97,7 @@ export default function FormSheetModal() {
               if (result.success) {
                 Alert.alert(
                   'Success',
-                  'Withdrawal request submitted successfully!',
+                  'Withdrawal request submitted successfully! Your funds will be processed within 1-24 hours.',
                   [{ text: 'OK', onPress: () => router.back() }]
                 );
               } else {
@@ -132,11 +134,11 @@ export default function FormSheetModal() {
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Binance Integration Notice */}
         <View style={styles.noticeCard}>
-          <IconSymbol name="info.circle.fill" size={24} color={colors.primary} />
+          <IconSymbol name="bitcoinsign.circle.fill" size={28} color="#F3BA2F" />
           <View style={{ flex: 1 }}>
-            <Text style={styles.noticeTitle}>Binance Integration</Text>
+            <Text style={styles.noticeTitle}>Binance Wallet Integration</Text>
             <Text style={styles.noticeText}>
-              Withdrawals and payments are processed through Binance. Make sure your Binance account is verified and ready to receive funds.
+              Withdrawals are processed securely through Binance. Make sure your Binance wallet address is correct and ready to receive MXI tokens.
             </Text>
           </View>
         </View>
@@ -145,9 +147,11 @@ export default function FormSheetModal() {
         <View style={styles.balanceCard}>
           <Text style={styles.balanceLabel}>Available Balance</Text>
           <Text style={styles.balanceAmount}>{user.balance.toFixed(6)} MXI</Text>
-          <Text style={styles.balanceUsd}>
-            ≈ ${(user.balance * mxiPrice).toFixed(2)} USD
-          </Text>
+          {mxiRate && (
+            <Text style={styles.balanceUsd}>
+              ≈ ${convertMXIToUSD(user.balance).toFixed(2)} USD
+            </Text>
+          )}
           
           <View style={styles.divider} />
           
@@ -155,16 +159,27 @@ export default function FormSheetModal() {
           <Text style={styles.withdrawableAmount}>
             {eligibility.availableForWithdrawal.toFixed(6)} MXI
           </Text>
-          <Text style={styles.withdrawableNote}>
-            Purchased: {user.withdrawalRestrictions?.purchasedAmount.toFixed(6)} MXI
-          </Text>
-          <Text style={styles.withdrawableNote}>
-            Commissions: {user.withdrawalRestrictions?.commissionEarnings.toFixed(6)} MXI (immediate)
-          </Text>
-          <Text style={styles.withdrawableNote}>
-            Mining: {user.withdrawalRestrictions?.miningEarnings.toFixed(6)} MXI 
-            {user.withdrawalRestrictions?.canWithdrawEarnings ? ' (available)' : ' (requires 10 referrals)'}
-          </Text>
+          <View style={styles.breakdownContainer}>
+            <View style={styles.breakdownRow}>
+              <View style={styles.breakdownDot} style={{ backgroundColor: colors.success }} />
+              <Text style={styles.withdrawableNote}>
+                Purchased: {user.withdrawalRestrictions?.purchasedAmount.toFixed(6)} MXI
+              </Text>
+            </View>
+            <View style={styles.breakdownRow}>
+              <View style={styles.breakdownDot} style={{ backgroundColor: colors.primary }} />
+              <Text style={styles.withdrawableNote}>
+                Commissions: {user.withdrawalRestrictions?.commissionEarnings.toFixed(6)} MXI (immediate)
+              </Text>
+            </View>
+            <View style={styles.breakdownRow}>
+              <View style={styles.breakdownDot} style={{ backgroundColor: user.withdrawalRestrictions?.canWithdrawEarnings ? colors.success : colors.warning }} />
+              <Text style={styles.withdrawableNote}>
+                Mining: {user.withdrawalRestrictions?.miningEarnings.toFixed(6)} MXI 
+                {user.withdrawalRestrictions?.canWithdrawEarnings ? ' (available)' : ' (requires 10 referrals)'}
+              </Text>
+            </View>
+          </View>
         </View>
 
         {/* Platform Selection */}
@@ -210,10 +225,10 @@ export default function FormSheetModal() {
 
         {/* Withdrawal Address */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Withdrawal Address</Text>
+          <Text style={styles.sectionTitle}>Binance Wallet Address</Text>
           <TextInput
             style={styles.input}
-            placeholder={`Enter your ${PLATFORMS.find(p => p.id === selectedPlatform)?.name} address`}
+            placeholder="Enter your Binance wallet address"
             placeholderTextColor={colors.textSecondary}
             value={address}
             onChangeText={setAddress}
@@ -250,9 +265,9 @@ export default function FormSheetModal() {
           >
             <Text style={styles.maxButtonText}>Max: {eligibility.availableForWithdrawal.toFixed(6)}</Text>
           </Pressable>
-          {amount && (
+          {amount && mxiRate && (
             <Text style={styles.amountUsd}>
-              ≈ ${(parseFloat(amount) * mxiPrice).toFixed(2)} USD
+              ≈ ${convertMXIToUSD(parseFloat(amount)).toFixed(2)} USD
             </Text>
           )}
         </View>
@@ -272,7 +287,10 @@ export default function FormSheetModal() {
               - Purchased MXI is always available for withdrawal
             </Text>
             <Text style={styles.infoText}>
-              - Processing time: 1-24 hours
+              - Processing time: 1-24 hours via Binance
+            </Text>
+            <Text style={styles.infoText}>
+              - Network: BSC (Binance Smart Chain)
             </Text>
           </View>
         </View>
@@ -292,7 +310,7 @@ export default function FormSheetModal() {
             color={colors.background} 
           />
           <Text style={styles.withdrawButtonText}>
-            {isProcessing ? 'Processing...' : 'Withdraw MXI'}
+            {isProcessing ? 'Processing...' : 'Withdraw via Binance'}
           </Text>
         </Pressable>
 
@@ -336,11 +354,13 @@ const styles = StyleSheet.create({
   noticeCard: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    backgroundColor: colors.highlight,
+    backgroundColor: '#F3BA2F' + '15',
     borderRadius: 12,
     padding: 16,
     marginBottom: 20,
     gap: 12,
+    borderWidth: 1,
+    borderColor: '#F3BA2F' + '30',
   },
   noticeTitle: {
     fontSize: 16,
@@ -390,12 +410,25 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '700',
     color: colors.success,
-    marginBottom: 8,
+    marginBottom: 12,
+  },
+  breakdownContainer: {
+    width: '100%',
+    gap: 6,
+  },
+  breakdownRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  breakdownDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
   withdrawableNote: {
     fontSize: 12,
     color: colors.textSecondary,
-    marginBottom: 2,
   },
   section: {
     marginBottom: 24,
@@ -422,8 +455,8 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   platformButtonActive: {
-    borderColor: colors.primary,
-    backgroundColor: colors.highlight,
+    borderColor: '#F3BA2F',
+    backgroundColor: '#F3BA2F' + '15',
   },
   platformButtonDisabled: {
     opacity: 0.5,
@@ -435,7 +468,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   platformNameActive: {
-    color: colors.primary,
+    color: '#F3BA2F',
   },
   platformNameDisabled: {
     color: colors.textSecondary,
@@ -500,7 +533,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   withdrawButton: {
-    backgroundColor: colors.success,
+    backgroundColor: '#F3BA2F',
     borderRadius: 12,
     padding: 18,
     flexDirection: 'row',

@@ -94,6 +94,72 @@ export default function TransactionsScreen() {
 
       <ScrollView style={styles.scrollView}>
         <View style={styles.content}>
+          {/* Quick Actions Card */}
+          <View style={styles.actionsCard}>
+            <Text style={styles.actionsTitle}>Quick Actions</Text>
+            
+            <View style={styles.actionsGrid}>
+              {/* Binance Withdrawal */}
+              <Pressable 
+                style={styles.actionButton}
+                onPress={() => router.push('/formsheet')}
+              >
+                <View style={[styles.actionIconContainer, { backgroundColor: colors.primary + '20' }]}>
+                  <IconSymbol name="arrow.up.circle.fill" size={28} color={colors.primary} />
+                </View>
+                <Text style={styles.actionLabel}>Withdraw</Text>
+                <Text style={styles.actionSubLabel}>via Binance</Text>
+              </Pressable>
+
+              {/* Send MXI */}
+              <Pressable 
+                style={styles.actionButton}
+                onPress={() => router.push('/send-mxi')}
+              >
+                <View style={[styles.actionIconContainer, { backgroundColor: colors.success + '20' }]}>
+                  <IconSymbol name="paperplane.fill" size={28} color={colors.success} />
+                </View>
+                <Text style={styles.actionLabel}>Send MXI</Text>
+                <Text style={styles.actionSubLabel}>User Code</Text>
+              </Pressable>
+
+              {/* Buy MXI */}
+              <Pressable 
+                style={styles.actionButton}
+                onPress={() => router.push('/purchase')}
+              >
+                <View style={[styles.actionIconContainer, { backgroundColor: colors.warning + '20' }]}>
+                  <IconSymbol name="cart.fill" size={28} color={colors.warning} />
+                </View>
+                <Text style={styles.actionLabel}>Buy MXI</Text>
+                <Text style={styles.actionSubLabel}>via Binance</Text>
+              </Pressable>
+
+              {/* Mining Panel */}
+              <Pressable 
+                style={styles.actionButton}
+                onPress={() => router.push('/mining-panel')}
+              >
+                <View style={[styles.actionIconContainer, { backgroundColor: colors.info + '20' }]}>
+                  <IconSymbol name="hammer.fill" size={28} color={colors.info} />
+                </View>
+                <Text style={styles.actionLabel}>Mining</Text>
+                <Text style={styles.actionSubLabel}>Access</Text>
+              </Pressable>
+            </View>
+          </View>
+
+          {/* Binance Integration Notice */}
+          <View style={styles.binanceNotice}>
+            <IconSymbol name="bitcoinsign.circle.fill" size={24} color="#F3BA2F" />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.binanceNoticeTitle}>Binance Integration Active</Text>
+              <Text style={styles.binanceNoticeText}>
+                All payments and withdrawals are processed securely through Binance wallet
+              </Text>
+            </View>
+          </View>
+
           {/* Metrics Summary Card */}
           <View style={styles.metricsCard}>
             <Text style={styles.metricsTitle}>Your Metrics</Text>
@@ -195,6 +261,25 @@ export default function TransactionsScreen() {
             </View>
           </View>
 
+          {/* User Code Card */}
+          <View style={styles.userCodeCard}>
+            <View style={styles.userCodeHeader}>
+              <IconSymbol name="person.text.rectangle.fill" size={24} color={colors.primary} />
+              <Text style={styles.userCodeTitle}>Your Unique Code</Text>
+            </View>
+            <View style={styles.userCodeContent}>
+              <Text style={styles.userCodeLabel}>Referral Code:</Text>
+              <Text style={styles.userCodeValue}>{user.referralCode}</Text>
+            </View>
+            <View style={styles.userCodeContent}>
+              <Text style={styles.userCodeLabel}>User ID:</Text>
+              <Text style={styles.userCodeValue}>{user.uniqueIdentifier}</Text>
+            </View>
+            <Text style={styles.userCodeNote}>
+              Share your referral code or receive MXI using your unique identifier
+            </Text>
+          </View>
+
           {/* Transaction History */}
           <View style={styles.historyHeader}>
             <Text style={styles.historyTitle}>Transaction History</Text>
@@ -283,6 +368,13 @@ export default function TransactionsScreen() {
                           </Text>
                         </View>
                       )}
+
+                      {transaction.platform && (
+                        <View style={styles.detailRow}>
+                          <Text style={styles.detailLabel}>Platform:</Text>
+                          <Text style={styles.detailValue}>{transaction.platform}</Text>
+                        </View>
+                      )}
                     </View>
                   )}
                 </View>
@@ -330,6 +422,73 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 20,
+  },
+  actionsCard: {
+    backgroundColor: colors.card,
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
+    elevation: 3,
+  },
+  actionsTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: 16,
+  },
+  actionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  actionButton: {
+    flex: 1,
+    minWidth: '45%',
+    alignItems: 'center',
+    backgroundColor: colors.highlight,
+    borderRadius: 12,
+    padding: 16,
+  },
+  actionIconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  actionLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: 2,
+  },
+  actionSubLabel: {
+    fontSize: 11,
+    color: colors.textSecondary,
+  },
+  binanceNotice: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#F3BA2F' + '15',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: '#F3BA2F' + '30',
+  },
+  binanceNoticeTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: 4,
+  },
+  binanceNoticeText: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    lineHeight: 18,
   },
   metricsCard: {
     backgroundColor: colors.card,
@@ -417,7 +576,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.card,
     borderRadius: 16,
     padding: 20,
-    marginBottom: 24,
+    marginBottom: 16,
     boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
     elevation: 3,
   },
@@ -456,6 +615,50 @@ const styles = StyleSheet.create({
   statusNote: {
     fontSize: 12,
     color: colors.textSecondary,
+  },
+  userCodeCard: {
+    backgroundColor: colors.card,
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 24,
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
+    elevation: 3,
+  },
+  userCodeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 16,
+  },
+  userCodeTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  userCodeContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.background,
+  },
+  userCodeLabel: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    fontWeight: '500',
+  },
+  userCodeValue: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.primary,
+    fontFamily: 'monospace',
+  },
+  userCodeNote: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginTop: 12,
+    lineHeight: 18,
   },
   historyHeader: {
     flexDirection: 'row',

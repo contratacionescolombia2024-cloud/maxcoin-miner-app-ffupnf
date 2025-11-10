@@ -109,6 +109,25 @@ export default function SendMXIScreen() {
           <Text style={styles.subtitle}>Transfer MXI to another user using their unique referral code</Text>
         </View>
 
+        {/* User Code Info Card */}
+        <View style={styles.userCodeCard}>
+          <View style={styles.userCodeHeader}>
+            <IconSymbol name="person.text.rectangle.fill" size={24} color={colors.primary} />
+            <Text style={styles.userCodeTitle}>Your Unique Codes</Text>
+          </View>
+          <View style={styles.userCodeRow}>
+            <Text style={styles.userCodeLabel}>Referral Code:</Text>
+            <Text style={styles.userCodeValue}>{user.referralCode}</Text>
+          </View>
+          <View style={styles.userCodeRow}>
+            <Text style={styles.userCodeLabel}>User ID:</Text>
+            <Text style={styles.userCodeValue}>{user.uniqueIdentifier}</Text>
+          </View>
+          <Text style={styles.userCodeNote}>
+            Others can send you MXI using your referral code
+          </Text>
+        </View>
+
         {isConnected && mxiRate && (
           <View style={styles.rateCard}>
             <View style={styles.rateHeader}>
@@ -168,6 +187,9 @@ export default function SendMXIScreen() {
               autoCapitalize="characters"
             />
           </View>
+          <Text style={styles.helperText}>
+            Ask the recipient for their referral code to send MXI
+          </Text>
         </View>
 
         <View style={styles.formSection}>
@@ -252,10 +274,18 @@ export default function SendMXIScreen() {
         <View style={styles.infoCard}>
           <IconSymbol name="info.circle.fill" size={24} color={colors.primary} />
           <View style={styles.infoContent}>
-            <Text style={styles.infoTitle}>About Commissions</Text>
+            <Text style={styles.infoTitle}>About User Code Transfers</Text>
             <Text style={styles.infoText}>
-              A {commissionRate}% commission is deducted from transfers and distributed to your referral chain. 
-              The recipient can withdraw the received MXI immediately.
+              - A {commissionRate}% commission is deducted from transfers and distributed to your referral chain
+            </Text>
+            <Text style={styles.infoText}>
+              - The recipient can withdraw the received MXI immediately
+            </Text>
+            <Text style={styles.infoText}>
+              - Transfers are instant and processed through the database
+            </Text>
+            <Text style={styles.infoText}>
+              - Make sure you have the correct referral code before sending
             </Text>
           </View>
         </View>
@@ -316,6 +346,50 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 8,
     textAlign: 'center',
+  },
+  userCodeCard: {
+    backgroundColor: colors.card,
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
+    elevation: 3,
+  },
+  userCodeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 16,
+  },
+  userCodeTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  userCodeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.background,
+  },
+  userCodeLabel: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    fontWeight: '500',
+  },
+  userCodeValue: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.primary,
+    fontFamily: 'monospace',
+  },
+  userCodeNote: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginTop: 12,
+    lineHeight: 18,
   },
   rateCard: {
     backgroundColor: colors.card,
@@ -500,12 +574,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: colors.text,
-    marginBottom: 4,
+    marginBottom: 8,
   },
   infoText: {
     fontSize: 13,
     color: colors.textSecondary,
-    lineHeight: 18,
+    lineHeight: 20,
+    marginBottom: 4,
   },
   buttonGroup: {
     gap: 12,
