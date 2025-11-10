@@ -7,7 +7,7 @@ import {
   ScrollView,
   Pressable,
   Alert,
-} from 'react-native';
+} from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocalization } from '@/contexts/LocalizationContext';
@@ -15,7 +15,7 @@ import { colors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 
 export default function PaymentMethodsScreen() {
-  const { purchaseMaxcoin, recordFirstPurchase, user } = useAuth();
+  const { purchaseMaxcoin, recordFirstPurchase, user, refreshUser } = useAuth();
   const { t } = useLocalization();
   const params = useLocalSearchParams();
   const amount = parseFloat(params.amount as string) || 0;
@@ -23,20 +23,20 @@ export default function PaymentMethodsScreen() {
   
   const [processing, setProcessing] = useState(false);
 
-  console.log('PaymentMethodsScreen - Amount:', amount, 'USD Value:', usdValue);
+  console.log('💳 PaymentMethodsScreen - Amount:', amount, 'MXI | USD Value:', usdValue, 'USDT');
 
   const handleProceedToPayment = async () => {
-    console.log('Confirming payment - Amount:', amount, 'USD Value:', usdValue);
+    console.log('💳 Confirming payment - Amount:', amount, 'MXI | USD Value:', usdValue, 'USDT');
     
     Alert.alert(
       'Confirm Purchase',
-      `You are about to purchase ${amount.toFixed(6)} MXI for $${usdValue.toFixed(2)} USDT via Binance Pay.\n\nProceed with payment?`,
+      `You are about to purchase ${amount.toFixed(6)} MXI for $${usdValue.toFixed(2)} USDT via Binance Pay.\n\n⚠️ TESTING MODE: Payment will be simulated automatically.\n\nProceed with payment?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Confirm',
           onPress: async () => {
-            console.log('User confirmed payment');
+            console.log('✅ User confirmed payment');
             await processBinancePayment();
           },
         },
@@ -45,48 +45,52 @@ export default function PaymentMethodsScreen() {
   };
 
   const processBinancePayment = async () => {
-    console.log('Processing Binance payment...');
+    console.log('🔄 Processing Binance payment...');
     setProcessing(true);
     
     try {
       // Simulate Binance payment processing (temporary for testing)
-      console.log('Simulating payment delay...');
+      console.log('⏳ Simulating payment delay...');
       await new Promise(resolve => setTimeout(resolve, 1500));
       
-      console.log('Payment simulation complete, updating balance...');
+      console.log('✅ Payment simulation complete, updating balance...');
       
       // Complete the purchase
       await purchaseMaxcoin(amount);
-      console.log('Balance updated with amount:', amount);
+      console.log('✅ Balance updated with amount:', amount, 'MXI');
       
       // Record first purchase for referral tracking
       await recordFirstPurchase(usdValue);
-      console.log('First purchase recorded with USD value:', usdValue);
+      console.log('✅ First purchase recorded with USD value:', usdValue, 'USDT');
       
-      let successMessage = `Successfully purchased ${amount.toFixed(6)} MXI!`;
+      // Refresh user data to get latest state
+      await refreshUser();
+      console.log('✅ User data refreshed');
+      
+      let successMessage = `✅ Successfully purchased ${amount.toFixed(6)} MXI!\n\nYour new balance has been updated.`;
       
       // Check if user still needs to make unlock payment
       if (!user?.unlockPaymentMade) {
-        successMessage += '\n\nNote: To access Mining and Lottery features, you need to make the 100 USDT unlock payment separately.';
+        successMessage += '\n\n📌 Note: To access Mining and Lottery features, you need to make the 100 USDT unlock payment separately.';
       }
       
-      console.log('Payment successful, showing success alert');
+      console.log('🎉 Payment successful, showing success alert');
       
       Alert.alert(
-        'Success',
+        '🎉 Success!',
         successMessage,
         [
           {
             text: 'OK',
             onPress: () => {
-              console.log('Navigating to home screen');
+              console.log('📱 Navigating to home screen');
               router.replace('/(tabs)/(home)');
             },
           },
         ]
       );
     } catch (error) {
-      console.error('Error processing payment:', error);
+      console.error('❌ Error processing payment:', error);
       Alert.alert('Error', 'Payment processing failed. Please try again.');
     } finally {
       setProcessing(false);

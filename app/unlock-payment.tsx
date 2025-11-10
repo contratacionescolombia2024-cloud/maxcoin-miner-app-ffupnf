@@ -17,7 +17,7 @@ import { IconSymbol } from '@/components/IconSymbol';
 const UNLOCK_COST_USDT = 100;
 
 export default function UnlockPaymentScreen() {
-  const { user, recordUnlockPayment, purchaseMaxcoin } = useAuth();
+  const { user, recordUnlockPayment, purchaseMaxcoin, refreshUser } = useAuth();
   const { mxiPrice } = useBinance();
   const [processing, setProcessing] = useState(false);
 
@@ -29,17 +29,17 @@ export default function UnlockPaymentScreen() {
       return;
     }
 
-    console.log('Confirming unlock payment - Amount:', mxiAmount, 'USD Value:', UNLOCK_COST_USDT);
+    console.log('🔓 Confirming unlock payment - Amount:', mxiAmount, 'MXI | USD Value:', UNLOCK_COST_USDT, 'USDT');
 
     Alert.alert(
       'Confirm Unlock Payment',
-      `You are about to pay ${UNLOCK_COST_USDT} USDT (${mxiAmount.toFixed(6)} MXI) to unlock Mining and Lottery features.\n\nThis is a one-time payment that unlocks all features permanently.\n\nProceed with payment?`,
+      `You are about to pay ${UNLOCK_COST_USDT} USDT (${mxiAmount.toFixed(6)} MXI) to unlock Mining and Lottery features.\n\nThis is a one-time payment that unlocks all features permanently.\n\n⚠️ TESTING MODE: Payment will be simulated automatically.\n\nProceed with payment?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Confirm',
           onPress: async () => {
-            console.log('User confirmed unlock payment');
+            console.log('✅ User confirmed unlock payment');
             await processUnlockPayment();
           },
         },
@@ -48,41 +48,45 @@ export default function UnlockPaymentScreen() {
   };
 
   const processUnlockPayment = async () => {
-    console.log('Processing unlock payment...');
+    console.log('🔄 Processing unlock payment...');
     setProcessing(true);
     
     try {
       // Simulate Binance payment processing (temporary for testing)
-      console.log('Simulating payment delay...');
+      console.log('⏳ Simulating payment delay...');
       await new Promise(resolve => setTimeout(resolve, 1500));
       
-      console.log('Payment simulation complete, updating balance...');
+      console.log('✅ Payment simulation complete, updating balance...');
       
       // Add MXI to user balance
       await purchaseMaxcoin(mxiAmount);
-      console.log('Balance updated with MXI amount:', mxiAmount);
+      console.log('✅ Balance updated with MXI amount:', mxiAmount);
       
       // Record the unlock payment
       await recordUnlockPayment();
-      console.log('Unlock payment recorded successfully');
+      console.log('✅ Unlock payment recorded successfully');
       
-      console.log('Unlock payment successful, showing success alert');
+      // Refresh user data to get latest state
+      await refreshUser();
+      console.log('✅ User data refreshed');
+      
+      console.log('🎉 Unlock payment successful, showing success alert');
       
       Alert.alert(
-        'Success!',
+        '🎉 Success!',
         `Congratulations! You have successfully unlocked Mining and Lottery features!\n\nYou received ${mxiAmount.toFixed(6)} MXI in your account.\n\nYou can now:\n- Access the Mining Panel\n- Purchase lottery tickets\n- Start earning MXI through mining`,
         [
           {
             text: 'Go to Mining Panel',
             onPress: () => {
-              console.log('Navigating to mining panel');
+              console.log('📱 Navigating to mining panel');
               router.replace('/mining-panel');
             },
           },
         ]
       );
     } catch (error) {
-      console.error('Error processing unlock payment:', error);
+      console.error('❌ Error processing unlock payment:', error);
       Alert.alert('Error', 'Payment processing failed. Please try again.');
     } finally {
       setProcessing(false);

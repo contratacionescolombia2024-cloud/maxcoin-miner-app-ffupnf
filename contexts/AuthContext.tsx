@@ -4,7 +4,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useMiningConfig } from './MiningConfigContext';
 import { supabase } from '@/app/integrations/supabase/client';
 
-// TEMPORARY TESTING FLAG - Set to true to bypass unlock payment requirement
+// ⚠️ TEMPORARY TESTING FLAG - Set to true to bypass unlock payment requirement
+// When true, all features (Mining & Lottery) are unlocked without payment
 const TEMPORARY_UNLOCK_BYPASS = true;
 
 export interface Transaction {
@@ -294,7 +295,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         if (!error) {
           await refreshUser();
-          console.log('First purchase recorded for referral tracking');
+          console.log('✅ First purchase recorded for referral tracking');
         }
       }
     } catch (error) {
@@ -317,7 +318,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         if (!error) {
           await refreshUser();
-          console.log('100 USDT unlock payment recorded - Mining and Lottery features unlocked');
+          console.log('✅ 100 USDT unlock payment recorded - Mining and Lottery features unlocked');
         }
       }
     } catch (error) {
@@ -328,10 +329,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Check if user has unlocked features (with temporary bypass)
   const isUnlocked = (): boolean => {
     if (TEMPORARY_UNLOCK_BYPASS) {
-      console.log('⚠️ TEMPORARY UNLOCK BYPASS ACTIVE - All features unlocked for testing');
+      console.warn('⚠️⚠️⚠️ TEMPORARY UNLOCK BYPASS ACTIVE ⚠️⚠️⚠️');
+      console.warn('All features (Mining & Lottery) are unlocked for testing');
+      console.warn('Set TEMPORARY_UNLOCK_BYPASS = false in AuthContext.tsx to disable');
       return true;
     }
-    return user?.unlockPaymentMade || false;
+    const unlocked = user?.unlockPaymentMade || false;
+    console.log('Unlock status:', unlocked ? 'UNLOCKED' : 'LOCKED');
+    return unlocked;
   };
 
   const register = async (
@@ -513,7 +518,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // Load user data
       await loadUserData(data.user.id);
       
-      console.log('Login successful for:', email);
+      console.log('✅ Login successful for:', email);
+      
+      // Show bypass warning if active
+      if (TEMPORARY_UNLOCK_BYPASS) {
+        console.warn('⚠️⚠️⚠️ TEMPORARY UNLOCK BYPASS IS ACTIVE ⚠️⚠️⚠️');
+      }
+      
       return { success: true };
     } catch (error) {
       console.error('Unexpected login error:', error);
@@ -835,6 +846,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         });
 
       await refreshUser();
+      console.log('✅ Purchase completed:', amount, 'MXI');
     } catch (error) {
       console.error('Error purchasing maxcoin:', error);
     }
