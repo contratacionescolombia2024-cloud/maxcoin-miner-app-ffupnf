@@ -46,7 +46,7 @@ export default function MiningPanelScreen() {
 
   useEffect(() => {
     loadMiningAccess();
-  }, [loadMiningAccess]);
+  }, []);
 
   const handlePurchaseAccess = () => {
     if (!user?.hasFirstPurchase) {

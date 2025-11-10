@@ -52,7 +52,7 @@ export default function MXILuckyScreen() {
 
   useEffect(() => {
     loadLotteryData();
-  }, [loadLotteryData]);
+  }, []);
 
   const handlePurchaseTickets = async () => {
     if (!user) {

@@ -175,8 +175,8 @@ export default function FormSheetModal() {
             <View style={styles.breakdownRow}>
               <View style={[styles.breakdownDot, { backgroundColor: user.withdrawalRestrictions?.canWithdrawEarnings ? colors.success : colors.warning }]} />
               <Text style={styles.withdrawableNote}>
-                Mining: {user.withdrawalRestrictions?.miningEarnings.toFixed(6)} MXI 
-                {user.withdrawalRestrictions?.canWithdrawEarnings ? ' (available)' : ' (requires 10 referrals)'}
+                Mining: {user.withdrawalRestrictions?.miningEarnings.toFixed(6)} MXI{' '}
+                {user.withdrawalRestrictions?.canWithdrawEarnings ? '(available)' : '(requires 10 referrals)'}
               </Text>
             </View>
           </View>
@@ -208,11 +208,13 @@ export default function FormSheetModal() {
                   size={32} 
                   color={selectedPlatform === platform.id ? platform.color : colors.textSecondary} 
                 />
-                <Text style={[
-                  styles.platformName,
-                  selectedPlatform === platform.id && styles.platformNameActive,
-                  platform.id !== 'binance' && styles.platformNameDisabled,
-                ]}>
+                <Text 
+                  style={[
+                    styles.platformName,
+                    selectedPlatform === platform.id && styles.platformNameActive,
+                    platform.id !== 'binance' && styles.platformNameDisabled,
+                  ]}
+                >
                   {platform.name}
                 </Text>
                 {platform.id !== 'binance' && (

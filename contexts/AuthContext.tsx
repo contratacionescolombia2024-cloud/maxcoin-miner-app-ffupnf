@@ -129,7 +129,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     loadCurrentUser();
-  }, [loadCurrentUser]);
+  }, []);
 
   const loadUserData = async (userId: string) => {
     try {

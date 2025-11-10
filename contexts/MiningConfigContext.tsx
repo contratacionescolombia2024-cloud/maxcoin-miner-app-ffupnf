@@ -20,7 +20,7 @@ interface MiningConfigContextType {
 }
 
 const DEFAULT_CONFIG: MiningConfig = {
-  miningRatePerMinute: 0.0002,
+  miningRatePerMinute: 0.00002,
   minPurchase: 0.02,
   maxPurchase: 10000,
   powerIncreasePercent: 1,
