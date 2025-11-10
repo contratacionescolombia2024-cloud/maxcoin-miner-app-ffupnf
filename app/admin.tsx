@@ -13,10 +13,12 @@ import { router } from 'expo-router';
 import { colors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useMiningConfig } from '@/contexts/MiningConfigContext';
+import { useLottery } from '@/contexts/LotteryContext';
 import { useAuth } from '@/contexts/AuthContext';
 
 export default function AdminScreen() {
   const { config, updateConfig, resetConfig } = useMiningConfig();
+  const { config: lotteryConfig, updateConfig: updateLotteryConfig } = useLottery();
   const { user } = useAuth();
   
   const [miningRate, setMiningRate] = useState(config.miningRatePerMinute.toString());
@@ -27,6 +29,12 @@ export default function AdminScreen() {
   const [level1Commission, setLevel1Commission] = useState(config.level1Commission.toString());
   const [level2Commission, setLevel2Commission] = useState(config.level2Commission.toString());
   const [level3Commission, setLevel3Commission] = useState(config.level3Commission.toString());
+
+  // Lottery configuration states
+  const [ticketPrice, setTicketPrice] = useState(lotteryConfig.ticketPrice.toString());
+  const [minTickets, setMinTickets] = useState(lotteryConfig.minTicketsForDraw.toString());
+  const [numWinners, setNumWinners] = useState(lotteryConfig.numberOfWinners.toString());
+  const [prizePercent, setPrizePercent] = useState(lotteryConfig.prizePoolPercentage.toString());
 
   const [adminPassword, setAdminPassword] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -67,7 +75,28 @@ export default function AdminScreen() {
       }
 
       await updateConfig(newConfig);
-      Alert.alert('Success', 'Mining configuration updated successfully!');
+
+      // Update lottery configuration
+      const newLotteryConfig = {
+        ticketPrice: parseFloat(ticketPrice),
+        minTicketsForDraw: parseInt(minTickets),
+        numberOfWinners: parseInt(numWinners),
+        prizePoolPercentage: parseFloat(prizePercent),
+      };
+
+      if (Object.values(newLotteryConfig).some(val => isNaN(val) || val < 0)) {
+        Alert.alert('Error', 'All lottery values must be valid positive numbers');
+        return;
+      }
+
+      if (newLotteryConfig.prizePoolPercentage > 100) {
+        Alert.alert('Error', 'Prize pool percentage cannot exceed 100%');
+        return;
+      }
+
+      await updateLotteryConfig(newLotteryConfig);
+
+      Alert.alert('Success', 'Configuration updated successfully!');
     } catch (error) {
       console.error('Error saving config:', error);
       Alert.alert('Error', 'Failed to save configuration');
@@ -351,6 +380,84 @@ export default function AdminScreen() {
             <IconSymbol name="info.circle.fill" size={16} color={colors.primary} />
             <Text style={styles.infoBoxText}>
               Current: L1: {config.level1Commission}%, L2: {config.level2Commission}%, L3: {config.level3Commission}%
+            </Text>
+          </View>
+        </View>
+
+        {/* Lottery Configuration */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <IconSymbol name="trophy.fill" size={24} color="#FFD700" />
+            <Text style={styles.cardTitle}>MXILUCKY Lottery Settings</Text>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Ticket Price (MXI)</Text>
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={styles.input}
+                value={ticketPrice}
+                onChangeText={setTicketPrice}
+                placeholder="1"
+                placeholderTextColor={colors.textSecondary}
+                keyboardType="decimal-pad"
+              />
+              <Text style={styles.inputSuffix}>MXI</Text>
+            </View>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Minimum Tickets for Draw</Text>
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={styles.input}
+                value={minTickets}
+                onChangeText={setMinTickets}
+                placeholder="1000"
+                placeholderTextColor={colors.textSecondary}
+                keyboardType="number-pad"
+              />
+              <Text style={styles.inputSuffix}>tickets</Text>
+            </View>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Number of Winners</Text>
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={styles.input}
+                value={numWinners}
+                onChangeText={setNumWinners}
+                placeholder="4"
+                placeholderTextColor={colors.textSecondary}
+                keyboardType="number-pad"
+              />
+              <Text style={styles.inputSuffix}>winners</Text>
+            </View>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Prize Pool Percentage (%)</Text>
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={styles.input}
+                value={prizePercent}
+                onChangeText={setPrizePercent}
+                placeholder="90"
+                placeholderTextColor={colors.textSecondary}
+                keyboardType="decimal-pad"
+              />
+              <Text style={styles.inputSuffix}>%</Text>
+            </View>
+            <Text style={styles.inputHint}>
+              Remaining {100 - parseFloat(prizePercent || '0')}% goes to admin wallet
+            </Text>
+          </View>
+
+          <View style={styles.infoBox}>
+            <IconSymbol name="info.circle.fill" size={16} color={colors.primary} />
+            <Text style={styles.infoBoxText}>
+              Current: {lotteryConfig.ticketPrice} MXI per ticket, {lotteryConfig.numberOfWinners} winners, {lotteryConfig.prizePoolPercentage}% prize pool
             </Text>
           </View>
         </View>

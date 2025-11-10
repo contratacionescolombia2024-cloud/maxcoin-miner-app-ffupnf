@@ -19,6 +19,8 @@ import { Button } from "@/components/button";
 import { WidgetProvider } from "@/contexts/WidgetContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { MiningConfigProvider } from "@/contexts/MiningConfigContext";
+import { MiningAccessProvider } from "@/contexts/MiningAccessContext";
+import { LotteryProvider } from "@/contexts/LotteryContext";
 import { LocalizationProvider } from "@/contexts/LocalizationContext";
 import { BinanceProvider } from "@/contexts/BinanceContext";
 
@@ -90,10 +92,12 @@ export default function RootLayout() {
         >
           <LocalizationProvider>
             <MiningConfigProvider>
-              <BinanceProvider>
-                <AuthProvider>
-                  <WidgetProvider>
-                    <GestureHandlerRootView>
+              <MiningAccessProvider>
+                <LotteryProvider>
+                  <BinanceProvider>
+                    <AuthProvider>
+                      <WidgetProvider>
+                        <GestureHandlerRootView>
                 <Stack>
                 {/* Auth screens */}
                 <Stack.Screen name="(auth)" options={{ headerShown: false }} />
@@ -154,12 +158,49 @@ export default function RootLayout() {
                     title: "Send MXI",
                   }}
                 />
+                <Stack.Screen
+                  name="mining-panel"
+                  options={{
+                    presentation: "modal",
+                    title: "Mining Panel",
+                  }}
+                />
+                <Stack.Screen
+                  name="mining-access-purchase"
+                  options={{
+                    presentation: "modal",
+                    title: "Purchase Mining Access",
+                  }}
+                />
+                <Stack.Screen
+                  name="mxilucky"
+                  options={{
+                    presentation: "modal",
+                    title: "MXILUCKY",
+                  }}
+                />
+                <Stack.Screen
+                  name="admin-users"
+                  options={{
+                    presentation: "modal",
+                    title: "User Management",
+                  }}
+                />
+                <Stack.Screen
+                  name="transactions"
+                  options={{
+                    presentation: "modal",
+                    title: "Transactions",
+                  }}
+                />
                 </Stack>
                 <SystemBars style={"auto"} />
-                </GestureHandlerRootView>
-                  </WidgetProvider>
-                </AuthProvider>
-              </BinanceProvider>
+                        </GestureHandlerRootView>
+                      </WidgetProvider>
+                    </AuthProvider>
+                  </BinanceProvider>
+                </LotteryProvider>
+              </MiningAccessProvider>
             </MiningConfigProvider>
           </LocalizationProvider>
         </ThemeProvider>

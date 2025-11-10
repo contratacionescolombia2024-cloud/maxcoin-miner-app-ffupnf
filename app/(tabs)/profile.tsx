@@ -176,15 +176,37 @@ export default function ProfileScreen() {
             </View>
           </View>
 
-          {/* Transaction History Button */}
-          <Pressable 
-            style={styles.actionButton}
-            onPress={() => router.push('/transactions')}
-          >
-            <IconSymbol name="list.bullet.rectangle" size={24} color={colors.primary} />
-            <Text style={styles.actionButtonText}>View Transaction History</Text>
-            <IconSymbol name="chevron.right" size={20} color={colors.textSecondary} />
-          </Pressable>
+          {/* Mining & Lottery Section */}
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>Mining & Lottery</Text>
+            
+            <Pressable 
+              style={styles.actionButton}
+              onPress={() => router.push('/mining-panel')}
+            >
+              <IconSymbol name="chart.bar.fill" size={24} color={colors.primary} />
+              <Text style={styles.actionButtonText}>Mining Panel</Text>
+              <IconSymbol name="chevron.right" size={20} color={colors.textSecondary} />
+            </Pressable>
+
+            <Pressable 
+              style={styles.actionButton}
+              onPress={() => router.push('/mxilucky')}
+            >
+              <IconSymbol name="trophy.fill" size={24} color="#FFD700" />
+              <Text style={styles.actionButtonText}>MXILUCKY Lottery</Text>
+              <IconSymbol name="chevron.right" size={20} color={colors.textSecondary} />
+            </Pressable>
+
+            <Pressable 
+              style={styles.actionButton}
+              onPress={() => router.push('/transactions')}
+            >
+              <IconSymbol name="list.bullet.rectangle" size={24} color={colors.primary} />
+              <Text style={styles.actionButtonText}>Transaction History</Text>
+              <IconSymbol name="chevron.right" size={20} color={colors.textSecondary} />
+            </Pressable>
+          </View>
 
           {/* Profile Information */}
           <View style={styles.card}>
