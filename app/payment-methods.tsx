@@ -119,7 +119,7 @@ export default function PaymentMethodsScreen() {
                 Secure cryptocurrency payment via Binance
               </Text>
               <View style={styles.onlyMethodBadge}>
-                <Text style={styles.onlyMethodText}>ONLY AVAILABLE METHOD</Text>
+                <Text style={styles.onlyMethodText}>ONLY PAYMENT METHOD</Text>
               </View>
             </View>
             
@@ -129,7 +129,7 @@ export default function PaymentMethodsScreen() {
           <View style={styles.infoBox}>
             <IconSymbol name="info.circle.fill" size={20} color={colors.primary} />
             <Text style={styles.infoBoxText}>
-              All payments are processed securely through Binance Pay. Other payment methods are not currently supported.
+              All payments are processed securely through Binance Pay using USDT. This is the only payment method available.
             </Text>
           </View>
         </View>
@@ -142,22 +142,22 @@ export default function PaymentMethodsScreen() {
           </View>
           
           <Text style={styles.noteText}>
-            • Only Binance Pay is available for payments
+            - Only Binance Pay (USDT) is available for payments
           </Text>
           <Text style={styles.noteText}>
-            • Purchased MXI can be withdrawn immediately
+            - Purchased MXI can be withdrawn immediately
           </Text>
           <Text style={styles.noteText}>
-            • Referral commissions are distributed automatically
+            - Referral commissions are distributed automatically
           </Text>
           <Text style={styles.noteText}>
-            • First purchase of 100 USDT unlocks Mining and Lottery
+            - First purchase of 100 USDT unlocks Mining and Lottery
           </Text>
           <Text style={styles.noteText}>
-            • Mining power increases with USDT purchases
+            - Mining power increases with USDT purchases (1% per 10 USDT)
           </Text>
           <Text style={styles.noteText}>
-            • All transactions are recorded in your history
+            - All transactions are recorded in your history
           </Text>
         </View>
 

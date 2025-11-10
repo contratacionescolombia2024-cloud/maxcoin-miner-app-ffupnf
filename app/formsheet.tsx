@@ -15,26 +15,9 @@ import {
 } from 'react-native';
 import { IconSymbol } from '@/components/IconSymbol';
 
-type Platform = 'binance' | 'coinbase' | 'skrill' | 'paypal';
-
-interface PlatformOption {
-  id: Platform;
-  name: string;
-  icon: string;
-  color: string;
-}
-
-const PLATFORMS: PlatformOption[] = [
-  { id: 'binance', name: 'Binance', icon: 'bitcoinsign.circle.fill', color: '#F3BA2F' },
-  { id: 'coinbase', name: 'Coinbase', icon: 'dollarsign.circle.fill', color: '#0052FF' },
-  { id: 'skrill', name: 'Skrill', icon: 'creditcard.fill', color: '#862165' },
-  { id: 'paypal', name: 'PayPal', icon: 'p.circle.fill', color: '#003087' },
-];
-
 export default function FormSheetModal() {
   const { user, withdrawMXI, updateWithdrawalAddress, canWithdrawAmount, getActiveReferralsCount } = useAuth();
   const { mxiRate, isConnected, convertMXIToUSD } = useBinance();
-  const [selectedPlatform, setSelectedPlatform] = useState<Platform>('binance');
   const [address, setAddress] = useState('');
   const [amount, setAmount] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -80,7 +63,7 @@ export default function FormSheetModal() {
 
     Alert.alert(
       'Confirm Withdrawal',
-      `Withdraw ${withdrawAmount.toFixed(6)} MXI via ${selectedPlatform}?\n\nAddress: ${address}\n\nEstimated value: $${usdValue.toFixed(2)} USD`,
+      `Withdraw ${withdrawAmount.toFixed(6)} MXI via Binance?\n\nWallet Address: ${address}\n\nEstimated value: $${usdValue.toFixed(2)} USD\n\nNetwork: BSC (Binance Smart Chain)`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -89,15 +72,15 @@ export default function FormSheetModal() {
             setIsProcessing(true);
             try {
               // Save withdrawal address
-              await updateWithdrawalAddress(selectedPlatform, address);
+              await updateWithdrawalAddress('binance', address);
 
               // Process withdrawal
-              const result = await withdrawMXI(selectedPlatform, address, withdrawAmount);
+              const result = await withdrawMXI('binance', address, withdrawAmount);
 
               if (result.success) {
                 Alert.alert(
                   'Success',
-                  'Withdrawal request submitted successfully! Your funds will be processed within 1-24 hours.',
+                  'Withdrawal request submitted successfully! Your MXI will be sent to your wallet within 1-24 hours via Binance.',
                   [{ text: 'OK', onPress: () => router.back() }]
                 );
               } else {
@@ -136,9 +119,9 @@ export default function FormSheetModal() {
         <View style={styles.noticeCard}>
           <IconSymbol name="bitcoinsign.circle.fill" size={28} color="#F3BA2F" />
           <View style={{ flex: 1 }}>
-            <Text style={styles.noticeTitle}>Binance Wallet Integration</Text>
+            <Text style={styles.noticeTitle}>Binance Withdrawal</Text>
             <Text style={styles.noticeText}>
-              Withdrawals are processed securely through Binance. Make sure your Binance wallet address is correct and ready to receive MXI tokens.
+              Withdrawals are processed securely through Binance. You can send MXI to any wallet that accepts MXI tokens on the BSC network.
             </Text>
           </View>
         </View>
@@ -182,69 +165,29 @@ export default function FormSheetModal() {
           </View>
         </View>
 
-        {/* Platform Selection */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Select Platform</Text>
-          <View style={styles.platformGrid}>
-            {PLATFORMS.map((platform) => (
-              <Pressable
-                key={platform.id}
-                style={[
-                  styles.platformButton,
-                  selectedPlatform === platform.id && styles.platformButtonActive,
-                  platform.id !== 'binance' && styles.platformButtonDisabled,
-                ]}
-                onPress={() => {
-                  if (platform.id === 'binance') {
-                    setSelectedPlatform(platform.id);
-                  } else {
-                    Alert.alert('Coming Soon', `${platform.name} integration is coming soon. Currently only Binance is supported.`);
-                  }
-                }}
-                disabled={platform.id !== 'binance'}
-              >
-                <IconSymbol 
-                  name={platform.icon} 
-                  size={32} 
-                  color={selectedPlatform === platform.id ? platform.color : colors.textSecondary} 
-                />
-                <Text 
-                  style={[
-                    styles.platformName,
-                    selectedPlatform === platform.id && styles.platformNameActive,
-                    platform.id !== 'binance' && styles.platformNameDisabled,
-                  ]}
-                >
-                  {platform.name}
-                </Text>
-                {platform.id !== 'binance' && (
-                  <Text style={styles.comingSoon}>Coming Soon</Text>
-                )}
-              </Pressable>
-            ))}
-          </View>
-        </View>
-
         {/* Withdrawal Address */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Binance Wallet Address</Text>
+          <Text style={styles.sectionTitle}>MXI Wallet Address (BSC Network)</Text>
+          <Text style={styles.sectionSubtitle}>
+            Enter any wallet address that accepts MXI tokens on Binance Smart Chain
+          </Text>
           <TextInput
             style={styles.input}
-            placeholder="Enter your Binance wallet address"
+            placeholder="Enter your MXI wallet address"
             placeholderTextColor={colors.textSecondary}
             value={address}
             onChangeText={setAddress}
             autoCapitalize="none"
             autoCorrect={false}
           />
-          {user.withdrawalAddresses?.[selectedPlatform] && (
+          {user.withdrawalAddresses?.binance && (
             <Pressable 
               style={styles.savedAddressButton}
-              onPress={() => setAddress(user.withdrawalAddresses[selectedPlatform] || '')}
+              onPress={() => setAddress(user.withdrawalAddresses.binance || '')}
             >
               <IconSymbol name="clock.arrow.circlepath" size={16} color={colors.primary} />
               <Text style={styles.savedAddressText}>
-                Use saved: {user.withdrawalAddresses[selectedPlatform]?.substring(0, 20)}...
+                Use saved: {user.withdrawalAddresses.binance?.substring(0, 20)}...
               </Text>
             </Pressable>
           )}
@@ -280,19 +223,25 @@ export default function FormSheetModal() {
           <View style={{ flex: 1 }}>
             <Text style={styles.infoTitle}>Withdrawal Information</Text>
             <Text style={styles.infoText}>
-              - Commissions are available for immediate withdrawal
+              - Withdrawals are processed through Binance
             </Text>
             <Text style={styles.infoText}>
-              - Mining earnings require 10 active referrals for first 5 withdrawals
-            </Text>
-            <Text style={styles.infoText}>
-              - Purchased MXI is always available for withdrawal
-            </Text>
-            <Text style={styles.infoText}>
-              - Processing time: 1-24 hours via Binance
+              - You can send MXI to any wallet that accepts MXI tokens
             </Text>
             <Text style={styles.infoText}>
               - Network: BSC (Binance Smart Chain)
+            </Text>
+            <Text style={styles.infoText}>
+              - Processing time: 1-24 hours
+            </Text>
+            <Text style={styles.infoText}>
+              - Commissions are available for immediate withdrawal
+            </Text>
+            <Text style={styles.infoText}>
+              - Mining earnings require 10 active referrals (first 5 withdrawals)
+            </Text>
+            <Text style={styles.infoText}>
+              - Purchased MXI is always available for withdrawal
             </Text>
           </View>
         </View>
@@ -439,46 +388,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: colors.text,
+    marginBottom: 6,
+  },
+  sectionSubtitle: {
+    fontSize: 13,
+    color: colors.textSecondary,
     marginBottom: 12,
-  },
-  platformGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  platformButton: {
-    flex: 1,
-    minWidth: '45%',
-    backgroundColor: colors.card,
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  platformButtonActive: {
-    borderColor: '#F3BA2F',
-    backgroundColor: '#F3BA2F' + '15',
-  },
-  platformButtonDisabled: {
-    opacity: 0.5,
-  },
-  platformName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.text,
-    marginTop: 8,
-  },
-  platformNameActive: {
-    color: '#F3BA2F',
-  },
-  platformNameDisabled: {
-    color: colors.textSecondary,
-  },
-  comingSoon: {
-    fontSize: 10,
-    color: colors.textSecondary,
-    marginTop: 4,
+    lineHeight: 18,
   },
   input: {
     backgroundColor: colors.card,
