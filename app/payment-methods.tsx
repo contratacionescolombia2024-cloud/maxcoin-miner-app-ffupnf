@@ -26,17 +26,26 @@ export default function PaymentMethodsScreen() {
   console.log('💳 PaymentMethodsScreen - Amount:', amount, 'MXI | USD Value:', usdValue, 'USDT');
 
   const handleProceedToPayment = async () => {
+    if (processing) {
+      console.log('⚠️ Payment already in progress, ignoring duplicate press');
+      return;
+    }
+
     console.log('💳 Confirming payment - Amount:', amount, 'MXI | USD Value:', usdValue, 'USDT');
     
     Alert.alert(
-      'Confirm Purchase',
-      `You are about to purchase ${amount.toFixed(6)} MXI for $${usdValue.toFixed(2)} USDT via Binance Pay.\n\n⚠️ TESTING MODE: Payment will be simulated automatically.\n\nProceed with payment?`,
+      'Confirmar Compra',
+      `Estás a punto de comprar ${amount.toFixed(6)} MXI por $${usdValue.toFixed(2)} USDT vía Binance Pay.\n\n⚠️ MODO DE PRUEBA: El pago se simulará automáticamente.\n\n¿Proceder con el pago?`,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Cancelar', 
+          style: 'cancel',
+          onPress: () => console.log('❌ User cancelled payment')
+        },
         {
-          text: 'Confirm',
+          text: 'Confirmar',
           onPress: async () => {
-            console.log('✅ User confirmed payment');
+            console.log('✅ User confirmed payment, starting process...');
             await processBinancePayment();
           },
         },
@@ -67,23 +76,24 @@ export default function PaymentMethodsScreen() {
       await refreshUser();
       console.log('✅ User data refreshed');
       
-      let successMessage = `✅ Successfully purchased ${amount.toFixed(6)} MXI!\n\nYour new balance has been updated.`;
+      let successMessage = `✅ ¡Compra exitosa de ${amount.toFixed(6)} MXI!\n\nTu nuevo saldo ha sido actualizado.`;
       
       // Check if user still needs to make unlock payment
       if (!user?.unlockPaymentMade) {
-        successMessage += '\n\n📌 Note: To access Mining and Lottery features, you need to make the 100 USDT unlock payment separately.';
+        successMessage += '\n\n📌 Nota: Para acceder a las funciones de Minería y Lotería, necesitas hacer el pago de desbloqueo de 100 USDT por separado.';
       }
       
       console.log('🎉 Payment successful, showing success alert');
       
       Alert.alert(
-        '🎉 Success!',
+        '🎉 ¡Éxito!',
         successMessage,
         [
           {
             text: 'OK',
             onPress: () => {
               console.log('📱 Navigating to home screen');
+              setProcessing(false);
               router.replace('/(tabs)/(home)');
             },
           },
@@ -91,9 +101,19 @@ export default function PaymentMethodsScreen() {
       );
     } catch (error) {
       console.error('❌ Error processing payment:', error);
-      Alert.alert('Error', 'Payment processing failed. Please try again.');
-    } finally {
       setProcessing(false);
+      Alert.alert(
+        'Error', 
+        'El procesamiento del pago falló. Por favor, inténtalo de nuevo.',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              console.log('User acknowledged error');
+            }
+          }
+        ]
+      );
     }
   };
 
@@ -103,7 +123,7 @@ export default function PaymentMethodsScreen() {
         <Pressable onPress={() => router.back()} style={styles.backButton}>
           <IconSymbol name="chevron.left" size={24} color={colors.text} />
         </Pressable>
-        <Text style={styles.headerTitle}>Payment Method</Text>
+        <Text style={styles.headerTitle}>Método de Pago</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -114,7 +134,7 @@ export default function PaymentMethodsScreen() {
             <IconSymbol name="cart.fill" size={64} color={colors.accent} />
           </View>
           
-          <Text style={styles.summaryTitle}>Purchase Summary</Text>
+          <Text style={styles.summaryTitle}>Resumen de Compra</Text>
           
           <View style={styles.amountDisplay}>
             <Text style={styles.amountMXI}>{amount.toFixed(6)} MXI</Text>
@@ -125,7 +145,7 @@ export default function PaymentMethodsScreen() {
             <View style={styles.unlockNotice}>
               <IconSymbol name="info.circle.fill" size={24} color={colors.primary} />
               <Text style={styles.unlockNoticeText}>
-                This is a mining power purchase. To unlock Mining and Lottery features, make the 100 USDT unlock payment separately.
+                Esta es una compra de poder de minería. Para desbloquear las funciones de Minería y Lotería, realiza el pago de desbloqueo de 100 USDT por separado.
               </Text>
             </View>
           )}
@@ -133,7 +153,7 @@ export default function PaymentMethodsScreen() {
 
         {/* Payment Method Card */}
         <View style={styles.paymentCard}>
-          <Text style={styles.sectionTitle}>Payment Method</Text>
+          <Text style={styles.sectionTitle}>Método de Pago</Text>
           
           <View style={styles.methodCard}>
             <View style={styles.methodIcon}>
@@ -143,10 +163,10 @@ export default function PaymentMethodsScreen() {
             <View style={styles.methodInfo}>
               <Text style={styles.methodName}>Binance Pay</Text>
               <Text style={styles.methodDescription}>
-                Secure cryptocurrency payment via Binance
+                Pago seguro de criptomonedas vía Binance
               </Text>
               <View style={styles.onlyMethodBadge}>
-                <Text style={styles.onlyMethodText}>ONLY PAYMENT METHOD</Text>
+                <Text style={styles.onlyMethodText}>ÚNICO MÉTODO DE PAGO</Text>
               </View>
             </View>
             
@@ -156,7 +176,7 @@ export default function PaymentMethodsScreen() {
           <View style={styles.infoBox}>
             <IconSymbol name="info.circle.fill" size={20} color={colors.primary} />
             <Text style={styles.infoBoxText}>
-              All payments are processed securely through Binance Pay using USDT. This is the only payment method available.
+              Todos los pagos se procesan de forma segura a través de Binance Pay usando USDT. Este es el único método de pago disponible.
             </Text>
           </View>
         </View>
@@ -165,32 +185,32 @@ export default function PaymentMethodsScreen() {
         <View style={styles.notesCard}>
           <View style={styles.notesHeader}>
             <IconSymbol name="exclamationmark.triangle.fill" size={24} color={colors.warning} />
-            <Text style={styles.notesTitle}>Important Information</Text>
+            <Text style={styles.notesTitle}>Información Importante</Text>
           </View>
           
           <Text style={styles.noteText}>
-            - Only Binance Pay (USDT) is available for payments
+            - Solo Binance Pay (USDT) está disponible para pagos
           </Text>
           <Text style={styles.noteText}>
-            - Purchased MXI can be withdrawn immediately
+            - Los MXI comprados se pueden retirar inmediatamente
           </Text>
           <Text style={styles.noteText}>
-            - Referral commissions are distributed automatically
+            - Las comisiones de referidos se distribuyen automáticamente
           </Text>
           <Text style={styles.noteText}>
-            - This is for mining power purchases only
+            - Esto es solo para compras de poder de minería
           </Text>
           <Text style={styles.noteText}>
-            - Mining power increases with USDT purchases (1% per 10 USDT)
+            - El poder de minería aumenta con compras USDT (1% por 10 USDT)
           </Text>
           <Text style={styles.noteText}>
-            - Unlock payment (100 USDT) is separate and required for Mining/Lottery
+            - El pago de desbloqueo (100 USDT) es separado y requerido para Minería/Lotería
           </Text>
           <Text style={styles.noteText}>
-            - All transactions are recorded in your history
+            - Todas las transacciones se registran en tu historial
           </Text>
           <Text style={styles.noteText}>
-            - ⚠️ TESTING MODE: Payment will be simulated automatically
+            - ⚠️ MODO DE PRUEBA: El pago se simulará automáticamente
           </Text>
         </View>
 
@@ -206,12 +226,12 @@ export default function PaymentMethodsScreen() {
           {processing ? (
             <>
               <IconSymbol name="hourglass" size={20} color={colors.background} />
-              <Text style={styles.proceedButtonText}>Processing Payment...</Text>
+              <Text style={styles.proceedButtonText}>Procesando Pago...</Text>
             </>
           ) : (
             <>
               <IconSymbol name="arrow.right.circle.fill" size={20} color={colors.background} />
-              <Text style={styles.proceedButtonText}>Pay ${usdValue.toFixed(2)} USDT</Text>
+              <Text style={styles.proceedButtonText}>Pagar ${usdValue.toFixed(2)} USDT</Text>
             </>
           )}
         </Pressable>

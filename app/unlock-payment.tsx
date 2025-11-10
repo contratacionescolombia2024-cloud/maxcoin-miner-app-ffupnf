@@ -25,21 +25,30 @@ export default function UnlockPaymentScreen() {
 
   const handlePurchase = async () => {
     if (!user) {
-      Alert.alert('Error', 'Please log in to continue');
+      Alert.alert('Error', 'Por favor inicia sesión para continuar');
+      return;
+    }
+
+    if (processing) {
+      console.log('⚠️ Payment already in progress, ignoring duplicate press');
       return;
     }
 
     console.log('🔓 Confirming unlock payment - Amount:', mxiAmount, 'MXI | USD Value:', UNLOCK_COST_USDT, 'USDT');
 
     Alert.alert(
-      'Confirm Unlock Payment',
-      `You are about to pay ${UNLOCK_COST_USDT} USDT (${mxiAmount.toFixed(6)} MXI) to unlock Mining and Lottery features.\n\nThis is a one-time payment that unlocks all features permanently.\n\n⚠️ TESTING MODE: Payment will be simulated automatically.\n\nProceed with payment?`,
+      'Confirmar Pago de Desbloqueo',
+      `Estás a punto de pagar ${UNLOCK_COST_USDT} USDT (${mxiAmount.toFixed(6)} MXI) para desbloquear las funciones de Minería y Lotería.\n\nEste es un pago único que desbloquea todas las funciones permanentemente.\n\n⚠️ MODO DE PRUEBA: El pago se simulará automáticamente.\n\n¿Proceder con el pago?`,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Cancelar', 
+          style: 'cancel',
+          onPress: () => console.log('❌ User cancelled unlock payment')
+        },
         {
-          text: 'Confirm',
+          text: 'Confirmar',
           onPress: async () => {
-            console.log('✅ User confirmed unlock payment');
+            console.log('✅ User confirmed unlock payment, starting process...');
             await processUnlockPayment();
           },
         },
@@ -73,13 +82,14 @@ export default function UnlockPaymentScreen() {
       console.log('🎉 Unlock payment successful, showing success alert');
       
       Alert.alert(
-        '🎉 Success!',
-        `Congratulations! You have successfully unlocked Mining and Lottery features!\n\nYou received ${mxiAmount.toFixed(6)} MXI in your account.\n\nYou can now:\n- Access the Mining Panel\n- Purchase lottery tickets\n- Start earning MXI through mining`,
+        '🎉 ¡Éxito!',
+        `¡Felicitaciones! Has desbloqueado exitosamente las funciones de Minería y Lotería!\n\nRecibiste ${mxiAmount.toFixed(6)} MXI en tu cuenta.\n\nAhora puedes:\n- Acceder al Panel de Minería\n- Comprar boletos de lotería\n- Comenzar a ganar MXI a través de la minería`,
         [
           {
-            text: 'Go to Mining Panel',
+            text: 'Ir al Panel de Minería',
             onPress: () => {
               console.log('📱 Navigating to mining panel');
+              setProcessing(false);
               router.replace('/mining-panel');
             },
           },
@@ -87,9 +97,19 @@ export default function UnlockPaymentScreen() {
       );
     } catch (error) {
       console.error('❌ Error processing unlock payment:', error);
-      Alert.alert('Error', 'Payment processing failed. Please try again.');
-    } finally {
       setProcessing(false);
+      Alert.alert(
+        'Error', 
+        'El procesamiento del pago falló. Por favor, inténtalo de nuevo.',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              console.log('User acknowledged error');
+            }
+          }
+        ]
+      );
     }
   };
 
@@ -101,16 +121,16 @@ export default function UnlockPaymentScreen() {
           <Pressable onPress={() => router.back()} style={styles.backButton}>
             <IconSymbol name="chevron.left" size={24} color={colors.text} />
           </Pressable>
-          <Text style={styles.headerTitle}>Unlock Features</Text>
+          <Text style={styles.headerTitle}>Desbloquear Funciones</Text>
           <View style={{ width: 40 }} />
         </View>
 
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
           <View style={styles.alreadyUnlockedCard}>
             <IconSymbol name="checkmark.circle.fill" size={80} color={colors.success} />
-            <Text style={styles.alreadyUnlockedTitle}>Already Unlocked!</Text>
+            <Text style={styles.alreadyUnlockedTitle}>¡Ya Desbloqueado!</Text>
             <Text style={styles.alreadyUnlockedDescription}>
-              You have already made the unlock payment. All features are available to you.
+              Ya has realizado el pago de desbloqueo. Todas las funciones están disponibles para ti.
             </Text>
             
             <Pressable 
@@ -118,7 +138,7 @@ export default function UnlockPaymentScreen() {
               onPress={() => router.push('/mining-panel')}
             >
               <IconSymbol name="arrow.right.circle.fill" size={20} color={colors.background} />
-              <Text style={styles.goToMiningButtonText}>Go to Mining Panel</Text>
+              <Text style={styles.goToMiningButtonText}>Ir al Panel de Minería</Text>
             </Pressable>
           </View>
         </ScrollView>
@@ -132,7 +152,7 @@ export default function UnlockPaymentScreen() {
         <Pressable onPress={() => router.back()} style={styles.backButton}>
           <IconSymbol name="chevron.left" size={24} color={colors.text} />
         </Pressable>
-        <Text style={styles.headerTitle}>Unlock Features</Text>
+        <Text style={styles.headerTitle}>Desbloquear Funciones</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -143,8 +163,8 @@ export default function UnlockPaymentScreen() {
             <IconSymbol name="lock.open.fill" size={80} color="#FFD700" />
           </View>
           
-          <Text style={styles.heroTitle}>Unlock All Features</Text>
-          <Text style={styles.heroSubtitle}>One-time payment of 100 USDT</Text>
+          <Text style={styles.heroTitle}>Desbloquear Todas las Funciones</Text>
+          <Text style={styles.heroSubtitle}>Pago único de 100 USDT</Text>
           
           <View style={styles.priceDisplay}>
             <Text style={styles.priceUSDT}>{UNLOCK_COST_USDT} USDT</Text>
@@ -156,15 +176,15 @@ export default function UnlockPaymentScreen() {
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <IconSymbol name="star.fill" size={32} color="#FFD700" />
-            <Text style={styles.cardTitle}>What You Get</Text>
+            <Text style={styles.cardTitle}>Lo Que Obtienes</Text>
           </View>
           
           <View style={styles.featureItem}>
             <IconSymbol name="checkmark.circle.fill" size={24} color={colors.success} />
             <View style={styles.featureTextContainer}>
-              <Text style={styles.featureTitle}>Mining Access</Text>
+              <Text style={styles.featureTitle}>Acceso a Minería</Text>
               <Text style={styles.featureDescription}>
-                Start earning MXI through automated mining
+                Comienza a ganar MXI a través de minería automatizada
               </Text>
             </View>
           </View>
@@ -172,9 +192,9 @@ export default function UnlockPaymentScreen() {
           <View style={styles.featureItem}>
             <IconSymbol name="checkmark.circle.fill" size={24} color={colors.success} />
             <View style={styles.featureTextContainer}>
-              <Text style={styles.featureTitle}>Lottery Access</Text>
+              <Text style={styles.featureTitle}>Acceso a Lotería</Text>
               <Text style={styles.featureDescription}>
-                Purchase lottery tickets and win prizes
+                Compra boletos de lotería y gana premios
               </Text>
             </View>
           </View>
@@ -182,9 +202,9 @@ export default function UnlockPaymentScreen() {
           <View style={styles.featureItem}>
             <IconSymbol name="checkmark.circle.fill" size={24} color={colors.success} />
             <View style={styles.featureTextContainer}>
-              <Text style={styles.featureTitle}>MXI Balance</Text>
+              <Text style={styles.featureTitle}>Saldo MXI</Text>
               <Text style={styles.featureDescription}>
-                Receive {mxiAmount.toFixed(6)} MXI immediately
+                Recibe {mxiAmount.toFixed(6)} MXI inmediatamente
               </Text>
             </View>
           </View>
@@ -192,9 +212,9 @@ export default function UnlockPaymentScreen() {
           <View style={styles.featureItem}>
             <IconSymbol name="checkmark.circle.fill" size={24} color={colors.success} />
             <View style={styles.featureTextContainer}>
-              <Text style={styles.featureTitle}>Referral Commissions</Text>
+              <Text style={styles.featureTitle}>Comisiones de Referidos</Text>
               <Text style={styles.featureDescription}>
-                Earn from your referrals&apos; activities
+                Gana de las actividades de tus referidos
               </Text>
             </View>
           </View>
@@ -202,9 +222,9 @@ export default function UnlockPaymentScreen() {
           <View style={styles.featureItem}>
             <IconSymbol name="checkmark.circle.fill" size={24} color={colors.success} />
             <View style={styles.featureTextContainer}>
-              <Text style={styles.featureTitle}>Permanent Access</Text>
+              <Text style={styles.featureTitle}>Acceso Permanente</Text>
               <Text style={styles.featureDescription}>
-                One-time payment, lifetime access
+                Pago único, acceso de por vida
               </Text>
             </View>
           </View>
@@ -214,7 +234,7 @@ export default function UnlockPaymentScreen() {
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <IconSymbol name="info.circle.fill" size={32} color={colors.primary} />
-            <Text style={styles.cardTitle}>How It Works</Text>
+            <Text style={styles.cardTitle}>Cómo Funciona</Text>
           </View>
           
           <View style={styles.stepItem}>
@@ -222,9 +242,9 @@ export default function UnlockPaymentScreen() {
               <Text style={styles.stepNumberText}>1</Text>
             </View>
             <View style={styles.stepTextContainer}>
-              <Text style={styles.stepTitle}>Make Payment</Text>
+              <Text style={styles.stepTitle}>Realizar Pago</Text>
               <Text style={styles.stepDescription}>
-                Pay 100 USDT via Binance Pay
+                Paga 100 USDT vía Binance Pay
               </Text>
             </View>
           </View>
@@ -234,9 +254,9 @@ export default function UnlockPaymentScreen() {
               <Text style={styles.stepNumberText}>2</Text>
             </View>
             <View style={styles.stepTextContainer}>
-              <Text style={styles.stepTitle}>Receive MXI</Text>
+              <Text style={styles.stepTitle}>Recibir MXI</Text>
               <Text style={styles.stepDescription}>
-                Get {mxiAmount.toFixed(6)} MXI in your account
+                Obtén {mxiAmount.toFixed(6)} MXI en tu cuenta
               </Text>
             </View>
           </View>
@@ -246,9 +266,9 @@ export default function UnlockPaymentScreen() {
               <Text style={styles.stepNumberText}>3</Text>
             </View>
             <View style={styles.stepTextContainer}>
-              <Text style={styles.stepTitle}>Features Unlocked</Text>
+              <Text style={styles.stepTitle}>Funciones Desbloqueadas</Text>
               <Text style={styles.stepDescription}>
-                Access Mining and Lottery immediately
+                Accede a Minería y Lotería inmediatamente
               </Text>
             </View>
           </View>
@@ -258,9 +278,9 @@ export default function UnlockPaymentScreen() {
               <Text style={styles.stepNumberText}>4</Text>
             </View>
             <View style={styles.stepTextContainer}>
-              <Text style={styles.stepTitle}>Start Earning</Text>
+              <Text style={styles.stepTitle}>Comenzar a Ganar</Text>
               <Text style={styles.stepDescription}>
-                Begin mining and participating in lottery
+                Empieza a minar y participar en la lotería
               </Text>
             </View>
           </View>
@@ -270,29 +290,29 @@ export default function UnlockPaymentScreen() {
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <IconSymbol name="exclamationmark.triangle.fill" size={32} color={colors.warning} />
-            <Text style={styles.cardTitle}>Important Information</Text>
+            <Text style={styles.cardTitle}>Información Importante</Text>
           </View>
           
           <Text style={styles.noteText}>
-            - This is a one-time unlock payment of 100 USDT
+            - Este es un pago único de desbloqueo de 100 USDT
           </Text>
           <Text style={styles.noteText}>
-            - Separate from mining power purchases
+            - Separado de las compras de poder de minería
           </Text>
           <Text style={styles.noteText}>
-            - You receive MXI equivalent to your payment
+            - Recibes MXI equivalente a tu pago
           </Text>
           <Text style={styles.noteText}>
-            - Mining requires additional 100 USDT package (30 days)
+            - La minería requiere un paquete adicional de 100 USDT (30 días)
           </Text>
           <Text style={styles.noteText}>
-            - Mining power can be boosted with USDT purchases
+            - El poder de minería se puede aumentar con compras USDT
           </Text>
           <Text style={styles.noteText}>
-            - All payments are processed via Binance Pay
+            - Todos los pagos se procesan vía Binance Pay
           </Text>
           <Text style={styles.noteText}>
-            - ⚠️ TESTING MODE: Payment will be simulated automatically
+            - ⚠️ MODO DE PRUEBA: El pago se simulará automáticamente
           </Text>
         </View>
 
@@ -308,12 +328,12 @@ export default function UnlockPaymentScreen() {
           {processing ? (
             <>
               <IconSymbol name="hourglass" size={24} color={colors.background} />
-              <Text style={styles.purchaseButtonText}>Processing Payment...</Text>
+              <Text style={styles.purchaseButtonText}>Procesando Pago...</Text>
             </>
           ) : (
             <>
               <IconSymbol name="lock.open.fill" size={24} color={colors.background} />
-              <Text style={styles.purchaseButtonText}>Unlock for {UNLOCK_COST_USDT} USDT</Text>
+              <Text style={styles.purchaseButtonText}>Desbloquear por {UNLOCK_COST_USDT} USDT</Text>
             </>
           )}
         </Pressable>
