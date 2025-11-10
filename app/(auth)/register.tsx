@@ -33,7 +33,6 @@ export default function RegisterScreen() {
   };
 
   const handleRegister = async () => {
-    // Validation
     if (!username.trim()) {
       Alert.alert('Error', 'Please enter a username');
       return;
@@ -45,7 +44,7 @@ export default function RegisterScreen() {
     }
 
     if (!email.trim()) {
-      Alert.alert('Error', 'Please enter an email address');
+      Alert.alert('Error', 'Please enter your email address');
       return;
     }
 
@@ -72,6 +71,7 @@ export default function RegisterScreen() {
     setIsLoading(true);
 
     try {
+      console.log('Attempting registration...');
       const result = await register(
         username.trim(),
         email.trim().toLowerCase(),
@@ -80,8 +80,9 @@ export default function RegisterScreen() {
       );
 
       if (result.success) {
+        console.log('Registration successful');
         Alert.alert(
-          'Registration Successful!',
+          'Registration Successful! 🎉',
           result.message || 'Please check your email to verify your account before logging in.',
           [
             {
@@ -91,7 +92,8 @@ export default function RegisterScreen() {
           ]
         );
       } else {
-        Alert.alert('Registration Failed', result.message || 'An error occurred during registration');
+        console.log('Registration failed:', result.message);
+        Alert.alert('Registration Failed', result.message || 'Please try again');
       }
     } catch (error) {
       console.error('Registration error:', error);
@@ -112,9 +114,9 @@ export default function RegisterScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.header}>
-          <IconSymbol name="person.crop.circle.badge.plus" size={80} color={colors.primary} />
+          <IconSymbol name="bitcoinsign.circle.fill" size={80} color={colors.primary} />
           <Text style={styles.title}>Create Account</Text>
-          <Text style={styles.subtitle}>Join Maxcoin MXI and start mining cryptocurrency</Text>
+          <Text style={styles.subtitle}>Join the Maxcoin MXI mining community</Text>
         </View>
 
         <View style={styles.form}>
@@ -128,6 +130,7 @@ export default function RegisterScreen() {
               onChangeText={setUsername}
               autoCapitalize="none"
               autoCorrect={false}
+              editable={!isLoading}
             />
           </View>
 
@@ -142,6 +145,7 @@ export default function RegisterScreen() {
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
+              editable={!isLoading}
             />
           </View>
 
@@ -155,8 +159,9 @@ export default function RegisterScreen() {
               onChangeText={setPassword}
               secureTextEntry={!showPassword}
               autoCapitalize="none"
+              editable={!isLoading}
             />
-            <Pressable onPress={() => setShowPassword(!showPassword)}>
+            <Pressable onPress={() => setShowPassword(!showPassword)} disabled={isLoading}>
               <IconSymbol
                 name={showPassword ? 'eye.slash.fill' : 'eye.fill'}
                 size={20}
@@ -175,8 +180,9 @@ export default function RegisterScreen() {
               onChangeText={setConfirmPassword}
               secureTextEntry={!showConfirmPassword}
               autoCapitalize="none"
+              editable={!isLoading}
             />
-            <Pressable onPress={() => setShowConfirmPassword(!showConfirmPassword)}>
+            <Pressable onPress={() => setShowConfirmPassword(!showConfirmPassword)} disabled={isLoading}>
               <IconSymbol
                 name={showConfirmPassword ? 'eye.slash.fill' : 'eye.fill'}
                 size={20}
@@ -186,7 +192,7 @@ export default function RegisterScreen() {
           </View>
 
           <View style={styles.inputContainer}>
-            <IconSymbol name="link" size={20} color={colors.textSecondary} />
+            <IconSymbol name="gift.fill" size={20} color={colors.textSecondary} />
             <TextInput
               style={styles.input}
               placeholder="Referral Code (Optional)"
@@ -195,14 +201,8 @@ export default function RegisterScreen() {
               onChangeText={setReferralCode}
               autoCapitalize="characters"
               autoCorrect={false}
+              editable={!isLoading}
             />
-          </View>
-
-          <View style={styles.infoBox}>
-            <IconSymbol name="info.circle.fill" size={20} color={colors.primary} />
-            <Text style={styles.infoText}>
-              You&apos;ll need to verify your email before you can log in. Check your inbox after registration.
-            </Text>
           </View>
 
           <Pressable
@@ -229,6 +229,7 @@ export default function RegisterScreen() {
           <Pressable
             style={styles.loginLink}
             onPress={() => router.replace('/(auth)/login')}
+            disabled={isLoading}
           >
             <Text style={styles.loginLinkText}>
               Already have an account? <Text style={styles.loginLinkBold}>Log In</Text>
@@ -236,9 +237,16 @@ export default function RegisterScreen() {
           </Pressable>
         </View>
 
+        <View style={styles.infoBox}>
+          <IconSymbol name="info.circle.fill" size={20} color={colors.primary} />
+          <Text style={styles.infoText}>
+            After registration, you&apos;ll receive a verification email. Please verify your email before logging in.
+          </Text>
+        </View>
+
         <View style={styles.footer}>
           <Text style={styles.footerText}>
-            By creating an account, you agree to our Terms of Service and Privacy Policy
+            By creating an account, you agree to our Terms of Service
           </Text>
         </View>
       </ScrollView>
@@ -274,7 +282,7 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   form: {
-    marginBottom: 30,
+    marginBottom: 20,
   },
   inputContainer: {
     flexDirection: 'row',
@@ -293,21 +301,6 @@ const styles = StyleSheet.create({
     color: colors.text,
     marginLeft: 12,
   },
-  infoBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.highlight,
-    borderRadius: 10,
-    padding: 14,
-    marginBottom: 20,
-    gap: 12,
-  },
-  infoText: {
-    flex: 1,
-    fontSize: 13,
-    color: colors.text,
-    lineHeight: 19,
-  },
   registerButton: {
     backgroundColor: colors.primary,
     borderRadius: 12,
@@ -315,6 +308,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    marginTop: 8,
     shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
@@ -359,14 +353,29 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.primary,
   },
+  infoBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: colors.highlight,
+    borderRadius: 10,
+    padding: 14,
+    marginBottom: 20,
+    gap: 12,
+  },
+  infoText: {
+    flex: 1,
+    fontSize: 13,
+    color: colors.text,
+    lineHeight: 19,
+  },
   footer: {
     marginTop: 'auto',
     paddingTop: 20,
+    paddingBottom: 20,
   },
   footerText: {
     fontSize: 12,
     color: colors.textSecondary,
     textAlign: 'center',
-    lineHeight: 18,
   },
 });

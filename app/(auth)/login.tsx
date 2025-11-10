@@ -37,12 +37,15 @@ export default function LoginScreen() {
     setIsLoading(true);
 
     try {
+      console.log('Attempting login...');
       const result = await login(email.trim().toLowerCase(), password);
 
       if (result.success) {
         console.log('Login successful, navigating to home');
+        // Navigation will happen automatically via auth state change
         router.replace('/(tabs)/(home)');
       } else {
+        console.log('Login failed:', result.message);
         Alert.alert('Login Failed', result.message || 'Invalid email or password');
       }
     } catch (error) {
@@ -81,6 +84,7 @@ export default function LoginScreen() {
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
+              editable={!isLoading}
             />
           </View>
 
@@ -94,8 +98,9 @@ export default function LoginScreen() {
               onChangeText={setPassword}
               secureTextEntry={!showPassword}
               autoCapitalize="none"
+              editable={!isLoading}
             />
-            <Pressable onPress={() => setShowPassword(!showPassword)}>
+            <Pressable onPress={() => setShowPassword(!showPassword)} disabled={isLoading}>
               <IconSymbol
                 name={showPassword ? 'eye.slash.fill' : 'eye.fill'}
                 size={20}
@@ -128,6 +133,7 @@ export default function LoginScreen() {
           <Pressable
             style={styles.registerLink}
             onPress={() => router.replace('/(auth)/register')}
+            disabled={isLoading}
           >
             <Text style={styles.registerLinkText}>
               Don&apos;t have an account? <Text style={styles.registerLinkBold}>Sign Up</Text>
@@ -138,7 +144,7 @@ export default function LoginScreen() {
         <View style={styles.infoBox}>
           <IconSymbol name="info.circle.fill" size={20} color={colors.primary} />
           <Text style={styles.infoText}>
-            Make sure to verify your email after registration before logging in.
+            After registration, you must verify your email before logging in. Check your inbox for the verification link.
           </Text>
         </View>
 
@@ -253,7 +259,7 @@ const styles = StyleSheet.create({
   },
   infoBox: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     backgroundColor: colors.highlight,
     borderRadius: 10,
     padding: 14,

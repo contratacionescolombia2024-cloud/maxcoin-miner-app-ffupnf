@@ -105,23 +105,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const { data: { session } } = await supabase.auth.getSession();
       
       if (session?.user) {
+        console.log('Loading user data for:', session.user.email);
         await loadUserData(session.user.id);
       } else {
-        // Fallback to AsyncStorage for backward compatibility
-        const currentUserId = await AsyncStorage.getItem(STORAGE_KEYS.CURRENT_USER);
-        if (currentUserId) {
-          const usersData = await AsyncStorage.getItem(STORAGE_KEYS.USERS);
-          if (usersData) {
-            const users = JSON.parse(usersData);
-            const foundUser = users.find((u: User) => u.id === currentUserId);
-            if (foundUser) {
-              setUser(foundUser);
-            }
-          }
-        }
+        console.log('No active session found');
+        setUser(null);
       }
     } catch (error) {
       console.error('Error loading current user:', error);
+      setUser(null);
     } finally {
       setIsLoading(false);
     }
@@ -129,10 +121,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     loadCurrentUser();
+
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth state changed:', event);
+      
+      if (event === 'SIGNED_IN' && session?.user) {
+        await loadUserData(session.user.id);
+      } else if (event === 'SIGNED_OUT') {
+        setUser(null);
+      } else if (event === 'USER_UPDATED' && session?.user) {
+        await loadUserData(session.user.id);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   const loadUserData = async (userId: string) => {
     try {
+      console.log('Loading user data for ID:', userId);
+      
       const { data: userData, error } = await supabase
         .from('users')
         .select(`
@@ -145,10 +156,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       if (error) {
         console.error('Error loading user data:', error);
+        
+        // If user profile doesn't exist, sign out
+        if (error.code === 'PGRST116') {
+          console.error('User profile not found in database. This should not happen.');
+          await supabase.auth.signOut();
+        }
         return;
       }
 
       if (userData) {
+        console.log('User data loaded successfully:', userData.email);
+        
         // Get transactions
         const { data: transactions } = await supabase
           .from('transactions')
@@ -281,6 +300,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     referralCode?: string
   ): Promise<{ success: boolean; message?: string }> => {
     try {
+      console.log('Starting registration for:', email);
+      
       // Check if username already exists
       const { data: existingUser } = await supabase
         .from('users')
@@ -294,7 +315,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       // Register with Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
-        email,
+        email: email.toLowerCase(),
         password,
         options: {
           emailRedirectTo: 'https://natively.dev/email-confirmed',
@@ -302,12 +323,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
 
       if (authError) {
+        console.error('Auth registration error:', authError);
         return { success: false, message: authError.message };
       }
 
       if (!authData.user) {
         return { success: false, message: 'Registration failed' };
       }
+
+      console.log('Auth user created:', authData.user.id);
 
       // Find referrer if referral code provided
       let referredByUserId: string | undefined;
@@ -320,6 +344,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         if (referrer) {
           referredByUserId = referrer.id;
+          console.log('Referrer found:', referredByUserId);
         }
       }
 
@@ -345,8 +370,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       if (profileError) {
         console.error('Profile creation error:', profileError);
+        // Clean up auth user if profile creation fails
+        await supabase.auth.admin.deleteUser(authData.user.id);
         return { success: false, message: 'Failed to create user profile' };
       }
+
+      console.log('User profile created successfully');
 
       // Create withdrawal restrictions record
       await supabase
@@ -360,25 +389,42 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           can_withdraw_earnings: false,
         });
 
-      console.log('User registered successfully. Please verify your email.');
+      console.log('User registered successfully. Email verification required.');
       return { 
         success: true, 
-        message: 'Registration successful! Please check your email to verify your account.' 
+        message: 'Registration successful! Please check your email to verify your account before logging in.' 
       };
     } catch (error) {
       console.error('Error registering user:', error);
-      return { success: false, message: 'Registration failed' };
+      return { success: false, message: 'Registration failed. Please try again.' };
     }
   };
 
   const login = async (email: string, password: string): Promise<{ success: boolean; message?: string }> => {
     try {
+      console.log('Attempting login for:', email);
+      
       const { data, error } = await supabase.auth.signInWithPassword({
-        email,
+        email: email.toLowerCase(),
         password,
       });
 
       if (error) {
+        console.error('Login error:', error);
+        
+        // Provide user-friendly error messages
+        if (error.message.includes('Email not confirmed')) {
+          return { 
+            success: false, 
+            message: 'Please verify your email before logging in. Check your inbox for the verification link.' 
+          };
+        } else if (error.message.includes('Invalid login credentials')) {
+          return { 
+            success: false, 
+            message: 'Invalid email or password. Please check your credentials and try again.' 
+          };
+        }
+        
         return { success: false, message: error.message };
       }
 
@@ -386,29 +432,50 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return { success: false, message: 'Login failed' };
       }
 
-      // Check if user is blocked
-      const { data: userData } = await supabase
+      console.log('Auth login successful for:', data.user.email);
+
+      // Check if user profile exists and is not blocked
+      const { data: userData, error: userError } = await supabase
         .from('users')
         .select('is_blocked, email_verified')
         .eq('id', data.user.id)
         .single();
 
+      if (userError) {
+        console.error('Error fetching user data:', userError);
+        await supabase.auth.signOut();
+        return { 
+          success: false, 
+          message: 'User profile not found. Please contact support.' 
+        };
+      }
+
       if (userData?.is_blocked) {
         await supabase.auth.signOut();
-        return { success: false, message: 'Account has been blocked. Please contact support.' };
+        return { 
+          success: false, 
+          message: 'Your account has been blocked. Please contact support for assistance.' 
+        };
       }
 
+      // Double-check email verification (belt and suspenders approach)
       if (!userData?.email_verified) {
+        console.warn('Email not verified in public.users table');
         await supabase.auth.signOut();
-        return { success: false, message: 'Please verify your email before logging in' };
+        return { 
+          success: false, 
+          message: 'Please verify your email before logging in. Check your inbox for the verification link.' 
+        };
       }
 
+      // Load user data
       await loadUserData(data.user.id);
-      console.log('User logged in:', { email });
+      
+      console.log('Login successful for:', email);
       return { success: true };
     } catch (error) {
-      console.error('Error logging in:', error);
-      return { success: false, message: 'Login failed' };
+      console.error('Unexpected login error:', error);
+      return { success: false, message: 'An unexpected error occurred. Please try again.' };
     }
   };
 
@@ -417,6 +484,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       await supabase.auth.signOut();
       await AsyncStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
       setUser(null);
+      console.log('User logged out successfully');
     } catch (error) {
       console.error('Error logging out:', error);
     }
