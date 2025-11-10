@@ -9,10 +9,14 @@ export const colors = {
   secondary: '#6c757d',
   accent: '#ffc107',
   card: '#ffffff',
+  cardBackground: '#ffffff',
   highlight: '#9bc8ff',
   success: '#28a745',
   danger: '#dc3545',
   warning: '#ffc107',
+  error: '#dc3545',
+  info: '#17a2b8',
+  border: '#e1e8ed',
 };
 
 export const buttonStyles = StyleSheet.create({
