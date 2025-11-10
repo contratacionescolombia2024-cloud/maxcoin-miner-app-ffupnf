@@ -30,7 +30,7 @@ interface MiningAccessContextType {
 }
 
 const STORAGE_KEY = '@maxcoin_mining_access';
-const MINING_ACCESS_COST_USDT = 50;
+const MINING_ACCESS_COST_USDT = 100; // Changed from 50 to 100 USDT
 
 const MiningAccessContext = createContext<MiningAccessContextType | undefined>(undefined);
 

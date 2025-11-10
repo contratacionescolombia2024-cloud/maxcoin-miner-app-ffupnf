@@ -49,6 +49,17 @@ export default function MiningPanelScreen() {
   };
 
   const handlePurchaseAccess = () => {
+    if (!user?.hasFirstPurchase) {
+      Alert.alert(
+        'First Purchase Required',
+        'You must make your first purchase of at least 100 USDT before accessing mining features. Would you like to purchase MXI now?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Purchase MXI', onPress: () => router.push('/purchase') },
+        ]
+      );
+      return;
+    }
     router.push('/mining-access-purchase');
   };
 
@@ -108,6 +119,52 @@ export default function MiningPanelScreen() {
     );
   }
 
+  // Check if user has made first purchase
+  if (!user?.hasFirstPurchase) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Pressable onPress={() => router.back()} style={styles.backButton}>
+            <IconSymbol name="chevron.left" size={24} color={colors.text} />
+          </Pressable>
+          <Text style={styles.headerTitle}>Mining Panel</Text>
+          <View style={{ width: 40 }} />
+        </View>
+
+        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          <View style={styles.lockedCard}>
+            <IconSymbol name="lock.fill" size={64} color={colors.warning} />
+            <Text style={styles.lockedTitle}>Mining Access Locked</Text>
+            <Text style={styles.lockedDescription}>
+              To unlock mining features, you must make your first purchase of at least 100 USDT worth of MXI.
+            </Text>
+            
+            <View style={styles.requirementBox}>
+              <Text style={styles.requirementTitle}>Requirements:</Text>
+              <Text style={styles.requirementText}>
+                • First purchase: 100 USDT minimum
+              </Text>
+              <Text style={styles.requirementText}>
+                • This unlocks both Mining and Lottery features
+              </Text>
+              <Text style={styles.requirementText}>
+                • After unlocking, you can purchase the mining package
+              </Text>
+            </View>
+
+            <Pressable 
+              style={styles.unlockButton} 
+              onPress={() => router.push('/purchase')}
+            >
+              <IconSymbol name="cart.fill" size={20} color={colors.background} />
+              <Text style={styles.unlockButtonText}>Purchase MXI Now</Text>
+            </Pressable>
+          </View>
+        </ScrollView>
+      </View>
+    );
+  }
+
   const referralMetrics = getReferralMetrics();
   const daysRemaining = getDaysRemaining();
   const accessCost = getMiningAccessCost();
@@ -156,7 +213,7 @@ export default function MiningPanelScreen() {
           ) : (
             <>
               <Text style={styles.noAccessText}>
-                You need to purchase the initial mining package (50 USDT) to start earning MXI through mining.
+                You need to purchase the initial mining package (100 USDT) to start earning MXI through mining.
               </Text>
               <View style={styles.costInfo}>
                 <Text style={styles.costLabel}>Access Cost:</Text>
@@ -310,7 +367,7 @@ export default function MiningPanelScreen() {
                 • 10 active referrals with purchases per cycle
               </Text>
               <Text style={styles.requirementText}>
-                • Purchases include initial package (50 USDT) or mining power
+                • Purchases include initial package (100 USDT) or mining power
               </Text>
               <Text style={styles.requirementText}>
                 • Current progress: {referralMetrics.active}/10 active referrals
@@ -372,6 +429,63 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: 16,
     color: colors.textSecondary,
+  },
+  lockedCard: {
+    backgroundColor: colors.cardBackground,
+    borderRadius: 20,
+    padding: 32,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: colors.warning,
+  },
+  lockedTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: colors.text,
+    marginTop: 20,
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  lockedDescription: {
+    fontSize: 16,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: 24,
+  },
+  requirementBox: {
+    backgroundColor: colors.background,
+    borderRadius: 12,
+    padding: 20,
+    width: '100%',
+    marginBottom: 24,
+  },
+  requirementTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: 12,
+  },
+  requirementText: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    lineHeight: 22,
+    marginBottom: 4,
+  },
+  unlockButton: {
+    backgroundColor: colors.primary,
+    borderRadius: 12,
+    padding: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+  },
+  unlockButtonText: {
+    color: colors.background,
+    fontSize: 16,
+    fontWeight: '700',
+    marginLeft: 8,
   },
   card: {
     backgroundColor: colors.cardBackground,
@@ -568,11 +682,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.text,
     marginBottom: 8,
-  },
-  requirementText: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    lineHeight: 20,
   },
   withdrawButton: {
     backgroundColor: colors.success,

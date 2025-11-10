@@ -51,6 +51,7 @@ export interface User {
   withdrawalRestrictions: WithdrawalRestrictions;
   isBlocked?: boolean;
   hasMiningAccess?: boolean;
+  hasFirstPurchase?: boolean; // New field to track first purchase of 100 USDT
 }
 
 interface AuthContextType {
@@ -71,6 +72,7 @@ interface AuthContextType {
   canWithdrawAmount: (amount: number) => { canWithdraw: boolean; availableForWithdrawal: number; message?: string };
   getReferralLink: () => string;
   getActiveReferralsCount: () => Promise<number>;
+  recordFirstPurchase: (usdAmount: number) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -169,6 +171,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const recordFirstPurchase = async (usdAmount: number) => {
+    if (!user) return;
+
+    try {
+      const usersData = await AsyncStorage.getItem(STORAGE_KEYS.USERS);
+      if (!usersData) return;
+
+      const users: User[] = JSON.parse(usersData);
+      const userIndex = users.findIndex(u => u.id === user.id);
+
+      if (userIndex !== -1) {
+        // Check if this is the first purchase of at least 100 USDT
+        if (!users[userIndex].hasFirstPurchase && usdAmount >= 100) {
+          users[userIndex].hasFirstPurchase = true;
+          await AsyncStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+          setUser(users[userIndex]);
+          console.log('First purchase of 100 USDT recorded - Mining and Lottery unlocked');
+        }
+      }
+    } catch (error) {
+      console.error('Error recording first purchase:', error);
+    }
+  };
+
   const register = async (
     username: string,
     email: string,
@@ -222,6 +248,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         },
         isBlocked: false,
         hasMiningAccess: false,
+        hasFirstPurchase: false, // New users start with no first purchase
       };
 
       if (referredByUserId) {
@@ -860,6 +887,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         canWithdrawAmount,
         getReferralLink,
         getActiveReferralsCount,
+        recordFirstPurchase,
       }}
     >
       {children}

@@ -216,6 +216,9 @@ export default function MiningAccessPurchaseScreen() {
           <Text style={styles.noteText}>
             • Only Binance integration is currently available
           </Text>
+          <Text style={styles.noteText}>
+            • Initial package cost is 100 USDT
+          </Text>
         </View>
 
         {/* Purchase Button */}

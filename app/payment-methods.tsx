@@ -10,10 +10,10 @@ import {
   Linking,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { colors } from '@/styles/commonStyles';
-import { IconSymbol } from '@/components/IconSymbol';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocalization } from '@/contexts/LocalizationContext';
+import { colors } from '@/styles/commonStyles';
+import { IconSymbol } from '@/components/IconSymbol';
 
 type PaymentMethod = 'binance' | 'coinbase' | 'skrill' | 'paypal';
 
@@ -27,62 +27,64 @@ interface PaymentMethodOption {
 }
 
 export default function PaymentMethodsScreen() {
-  const { amount } = useLocalSearchParams<{ amount: string }>();
-  const { user, purchaseMaxcoin } = useAuth();
+  const { purchaseMaxcoin, recordFirstPurchase } = useAuth();
   const { t } = useLocalization();
+  const params = useLocalSearchParams();
+  const amount = parseFloat(params.amount as string) || 0;
+  const usdValue = parseFloat(params.usdValue as string) || 0;
+  
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
-
-  const purchaseAmount = parseFloat(amount || '10');
+  const [processing, setProcessing] = useState(false);
 
   const paymentMethods: PaymentMethodOption[] = [
     {
       id: 'binance',
       name: 'Binance Pay',
       icon: 'bitcoinsign.circle.fill',
-      description: t('payment.binanceDescription'),
+      description: 'Pay with Binance (Recommended)',
       color: '#F3BA2F',
       available: true,
     },
     {
       id: 'coinbase',
-      name: 'Coinbase Commerce',
+      name: 'Coinbase',
       icon: 'dollarsign.circle.fill',
-      description: t('payment.coinbaseDescription'),
+      description: 'Pay with Coinbase',
       color: '#0052FF',
-      available: true,
+      available: false,
     },
     {
       id: 'skrill',
       name: 'Skrill',
       icon: 'creditcard.fill',
-      description: t('payment.skrillDescription'),
+      description: 'Pay with Skrill',
       color: '#862165',
-      available: true,
+      available: false,
     },
     {
       id: 'paypal',
       name: 'PayPal',
-      icon: 'dollarsign.square.fill',
-      description: t('payment.paypalDescription'),
-      color: '#0070BA',
-      available: true,
+      icon: 'p.circle.fill',
+      description: 'Pay with PayPal',
+      color: '#003087',
+      available: false,
     },
   ];
 
   const handlePaymentMethodSelect = (method: PaymentMethod) => {
+    if (!paymentMethods.find(m => m.id === method)?.available) {
+      Alert.alert('Coming Soon', 'This payment method will be available soon.');
+      return;
+    }
     setSelectedMethod(method);
   };
 
   const handleProceedToPayment = async () => {
     if (!selectedMethod) {
-      Alert.alert(t('common.error'), t('payment.selectMethodError'));
+      Alert.alert('Error', 'Please select a payment method');
       return;
     }
 
-    setIsProcessing(true);
-
-    // Simulate payment processing based on selected method
     switch (selectedMethod) {
       case 'binance':
         await processBinancePayment();
@@ -100,132 +102,84 @@ export default function PaymentMethodsScreen() {
   };
 
   const processBinancePayment = async () => {
-    // In production, this would:
-    // 1. Create a Binance Pay order via API
-    // 2. Get the payment URL
-    // 3. Open the URL in browser or WebView
-    // 4. Handle the callback/webhook
+    setProcessing(true);
     
-    console.log('Processing Binance Pay payment for', purchaseAmount, 'MXI');
-    
-    // Simulate API call
-    setTimeout(async () => {
-      // Simulate successful payment
-      await purchaseMaxcoin(purchaseAmount);
-      setIsProcessing(false);
+    try {
+      // Simulate payment processing
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Complete the purchase
+      await purchaseMaxcoin(amount);
+      
+      // Record first purchase if it's at least 100 USDT
+      await recordFirstPurchase(usdValue);
       
       Alert.alert(
-        t('payment.paymentSuccess'),
-        t('payment.binanceSuccessMessage', { amount: purchaseAmount.toFixed(2) }),
+        'Success',
+        `Successfully purchased ${amount.toFixed(6)} MXI!${usdValue >= 100 ? '\n\nCongratulations! You have unlocked Mining and Lottery features!' : ''}`,
         [
           {
-            text: t('common.ok'),
+            text: 'OK',
             onPress: () => router.replace('/(tabs)/(home)'),
           },
         ]
       );
-    }, 2000);
+    } catch (error) {
+      console.error('Error processing payment:', error);
+      Alert.alert('Error', 'Payment processing failed. Please try again.');
+    } finally {
+      setProcessing(false);
+    }
   };
 
   const processCoinbasePayment = async () => {
-    // In production, this would:
-    // 1. Create a Coinbase Commerce charge via API
-    // 2. Get the hosted checkout URL
-    // 3. Open the URL in browser
-    // 4. Handle the webhook notification
-    
-    console.log('Processing Coinbase Commerce payment for', purchaseAmount, 'MXI');
-    
-    // Simulate API call
-    setTimeout(async () => {
-      // Simulate successful payment
-      await purchaseMaxcoin(purchaseAmount);
-      setIsProcessing(false);
-      
-      Alert.alert(
-        t('payment.paymentSuccess'),
-        t('payment.coinbaseSuccessMessage', { amount: purchaseAmount.toFixed(2) }),
-        [
-          {
-            text: t('common.ok'),
-            onPress: () => router.replace('/(tabs)/(home)'),
-          },
-        ]
-      );
-    }, 2000);
+    Alert.alert('Coming Soon', 'Coinbase integration will be available soon.');
   };
 
   const processSkrillPayment = async () => {
-    // In production, this would:
-    // 1. Create a Skrill payment session via API
-    // 2. Get the payment URL
-    // 3. Open the URL in browser or WebView
-    // 4. Handle the callback
-    
-    console.log('Processing Skrill payment for', purchaseAmount, 'MXI');
-    
-    // Simulate API call
-    setTimeout(async () => {
-      // Simulate successful payment
-      await purchaseMaxcoin(purchaseAmount);
-      setIsProcessing(false);
-      
-      Alert.alert(
-        t('payment.paymentSuccess'),
-        t('payment.skrillSuccessMessage', { amount: purchaseAmount.toFixed(2) }),
-        [
-          {
-            text: t('common.ok'),
-            onPress: () => router.replace('/(tabs)/(home)'),
-          },
-        ]
-      );
-    }, 2000);
+    Alert.alert('Coming Soon', 'Skrill integration will be available soon.');
   };
 
   const processPayPalPayment = async () => {
-    // In production, this would:
-    // 1. Create a PayPal order via your backend API
-    // 2. Get the approval URL from PayPal
-    // 3. Open the URL in browser or WebView using expo-web-browser
-    // 4. Handle the return URL callback
-    // 5. Capture the payment on your backend
-    // 6. Update user balance
-    
-    console.log('Processing PayPal payment for', purchaseAmount, 'MXI');
-    
-    // Simulate API call
-    setTimeout(async () => {
-      // Simulate successful payment
-      await purchaseMaxcoin(purchaseAmount);
-      setIsProcessing(false);
-      
-      Alert.alert(
-        t('payment.paymentSuccess'),
-        t('payment.paypalSuccessMessage', { amount: purchaseAmount.toFixed(2) }),
-        [
-          {
-            text: t('common.ok'),
-            onPress: () => router.replace('/(tabs)/(home)'),
-          },
-        ]
-      );
-    }, 2000);
+    Alert.alert('Coming Soon', 'PayPal integration will be available soon.');
   };
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.content}>
-        <View style={styles.header}>
-          <IconSymbol name="creditcard.fill" size={80} color={colors.primary} />
-          <Text style={styles.title}>{t('payment.selectPaymentMethod')}</Text>
-          <Text style={styles.subtitle}>
-            {t('payment.purchasingAmount', { amount: purchaseAmount.toFixed(2) })}
-          </Text>
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <Pressable onPress={() => router.back()} style={styles.backButton}>
+          <IconSymbol name="chevron.left" size={24} color={colors.text} />
+        </Pressable>
+        <Text style={styles.headerTitle}>Payment Method</Text>
+        <View style={{ width: 40 }} />
+      </View>
+
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Purchase Summary */}
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryTitle}>Purchase Summary</Text>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Amount (MXI):</Text>
+            <Text style={styles.summaryValue}>{amount.toFixed(6)} MXI</Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Total (USD):</Text>
+            <Text style={styles.summaryValue}>${usdValue.toFixed(2)}</Text>
+          </View>
+          
+          {usdValue >= 100 && (
+            <View style={styles.unlockNotice}>
+              <IconSymbol name="star.fill" size={20} color="#FFD700" />
+              <Text style={styles.unlockNoticeText}>
+                This purchase will unlock Mining and Lottery features!
+              </Text>
+            </View>
+          )}
         </View>
 
-        <View style={styles.methodsContainer}>
-          <Text style={styles.sectionTitle}>{t('payment.availableMethods')}</Text>
+        {/* Payment Methods */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Select Payment Method</Text>
           
           {paymentMethods.map((method) => (
             <Pressable
@@ -235,90 +189,67 @@ export default function PaymentMethodsScreen() {
                 selectedMethod === method.id && styles.methodCardSelected,
                 !method.available && styles.methodCardDisabled,
               ]}
-              onPress={() => method.available && handlePaymentMethodSelect(method.id)}
+              onPress={() => handlePaymentMethodSelect(method.id)}
               disabled={!method.available}
             >
-              <View style={styles.methodHeader}>
-                <View style={[styles.iconContainer, { backgroundColor: method.color + '20' }]}>
-                  <IconSymbol name={method.icon} size={32} color={method.color} />
-                </View>
-                <View style={styles.methodInfo}>
-                  <Text style={styles.methodName}>{method.name}</Text>
-                  <Text style={styles.methodDescription}>{method.description}</Text>
-                </View>
-                {selectedMethod === method.id && (
-                  <View style={styles.checkmark}>
-                    <IconSymbol name="checkmark.circle.fill" size={28} color={colors.success} />
-                  </View>
+              <View style={styles.methodIcon}>
+                <IconSymbol name={method.icon} size={32} color={method.color} />
+              </View>
+              
+              <View style={styles.methodInfo}>
+                <Text style={styles.methodName}>{method.name}</Text>
+                <Text style={styles.methodDescription}>{method.description}</Text>
+                {!method.available && (
+                  <Text style={styles.comingSoon}>Coming Soon</Text>
                 )}
               </View>
               
-              {!method.available && (
-                <View style={styles.unavailableBadge}>
-                  <Text style={styles.unavailableText}>{t('payment.comingSoon')}</Text>
-                </View>
+              {selectedMethod === method.id && (
+                <IconSymbol name="checkmark.circle.fill" size={24} color={colors.success} />
               )}
             </Pressable>
           ))}
         </View>
 
-        <View style={styles.infoCard}>
-          <IconSymbol name="info.circle.fill" size={24} color={colors.primary} />
-          <View style={styles.infoContent}>
-            <Text style={styles.infoTitle}>{t('payment.securePayment')}</Text>
-            <Text style={styles.infoText}>{t('payment.securePaymentDescription')}</Text>
-          </View>
+        {/* Important Notes */}
+        <View style={styles.notesCard}>
+          <Text style={styles.notesTitle}>Important Notes:</Text>
+          <Text style={styles.noteText}>
+            • Only Binance integration is currently available
+          </Text>
+          <Text style={styles.noteText}>
+            • Purchased MXI can be withdrawn immediately
+          </Text>
+          <Text style={styles.noteText}>
+            • Referral commissions are distributed automatically
+          </Text>
+          <Text style={styles.noteText}>
+            • First purchase of 100 USDT unlocks Mining and Lottery
+          </Text>
         </View>
 
-        <View style={styles.detailsCard}>
-          <Text style={styles.detailsTitle}>{t('payment.orderSummary')}</Text>
-          
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>{t('payment.amount')}</Text>
-            <Text style={styles.detailValue}>{purchaseAmount.toFixed(2)} MXI</Text>
-          </View>
-          
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>{t('payment.processingFee')}</Text>
-            <Text style={styles.detailValue}>{t('payment.free')}</Text>
-          </View>
-          
-          <View style={styles.divider} />
-          
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabelBold}>{t('payment.total')}</Text>
-            <Text style={styles.detailValueBold}>{purchaseAmount.toFixed(2)} MXI</Text>
-          </View>
-        </View>
+        {/* Proceed Button */}
+        <Pressable
+          style={[
+            styles.proceedButton,
+            (!selectedMethod || processing) && styles.proceedButtonDisabled,
+          ]}
+          onPress={handleProceedToPayment}
+          disabled={!selectedMethod || processing}
+        >
+          {processing ? (
+            <Text style={styles.proceedButtonText}>Processing...</Text>
+          ) : (
+            <>
+              <IconSymbol name="arrow.right.circle.fill" size={20} color={colors.background} />
+              <Text style={styles.proceedButtonText}>Proceed to Payment</Text>
+            </>
+          )}
+        </Pressable>
 
-        <View style={styles.buttonGroup}>
-          <Pressable
-            style={[
-              styles.button,
-              styles.primaryButton,
-              (!selectedMethod || isProcessing) && styles.buttonDisabled,
-            ]}
-            onPress={handleProceedToPayment}
-            disabled={!selectedMethod || isProcessing}
-          >
-            <IconSymbol name="checkmark.circle.fill" size={20} color="#ffffff" />
-            <Text style={styles.buttonText}>
-              {isProcessing ? t('payment.processing') : t('payment.proceedToPayment')}
-            </Text>
-          </Pressable>
-
-          <Pressable
-            style={[styles.button, styles.secondaryButton]}
-            onPress={() => router.back()}
-            disabled={isProcessing}
-          >
-            <Text style={[styles.buttonText, { color: colors.text }]}>
-              {t('common.cancel')}
-            </Text>
-          </Pressable>
-        </View>
-      </View>
-    </ScrollView>
+        <View style={{ height: 100 }} />
+      </ScrollView>
+    </View>
   );
 }
 
@@ -327,185 +258,166 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 60,
+    paddingBottom: 20,
+    backgroundColor: colors.cardBackground,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: colors.text,
+  },
   content: {
+    flex: 1,
     padding: 20,
   },
-  header: {
-    alignItems: 'center',
-    marginBottom: 32,
+  summaryCard: {
+    backgroundColor: colors.cardBackground,
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: colors.text,
-    marginTop: 16,
-    textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: 16,
-    color: colors.textSecondary,
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  methodsContainer: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
+  summaryTitle: {
     fontSize: 18,
     fontWeight: '700',
     color: colors.text,
     marginBottom: 16,
   },
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  summaryLabel: {
+    fontSize: 15,
+    color: colors.textSecondary,
+  },
+  summaryValue: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  unlockNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.background,
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#FFD700',
+  },
+  unlockNoticeText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text,
+    marginLeft: 12,
+    flex: 1,
+  },
+  section: {
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: 12,
+  },
   methodCard: {
-    backgroundColor: colors.card,
-    borderRadius: 16,
-    padding: 20,
+    backgroundColor: colors.cardBackground,
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 12,
     borderWidth: 2,
-    borderColor: 'transparent',
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
-    elevation: 3,
+    borderColor: colors.border,
   },
   methodCardSelected: {
-    borderColor: colors.success,
-    backgroundColor: colors.highlight,
+    borderColor: colors.primary,
+    backgroundColor: colors.background,
   },
   methodCardDisabled: {
     opacity: 0.5,
   },
-  methodHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-  },
-  iconContainer: {
-    width: 60,
-    height: 60,
-    borderRadius: 12,
+  methodIcon: {
+    width: 48,
+    height: 48,
     alignItems: 'center',
     justifyContent: 'center',
+    marginRight: 12,
   },
   methodInfo: {
     flex: 1,
   },
   methodName: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 16,
+    fontWeight: '600',
     color: colors.text,
     marginBottom: 4,
   },
   methodDescription: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    lineHeight: 18,
-  },
-  checkmark: {
-    marginLeft: 8,
-  },
-  unavailableBadge: {
-    marginTop: 12,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    backgroundColor: colors.textSecondary + '20',
-    borderRadius: 8,
-    alignSelf: 'flex-start',
-  },
-  unavailableText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: colors.textSecondary,
-  },
-  infoCard: {
-    flexDirection: 'row',
-    backgroundColor: colors.highlight,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 24,
-    gap: 12,
-  },
-  infoContent: {
-    flex: 1,
-  },
-  infoTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.text,
-    marginBottom: 4,
-  },
-  infoText: {
     fontSize: 13,
     color: colors.textSecondary,
-    lineHeight: 18,
   },
-  detailsCard: {
-    backgroundColor: colors.card,
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 24,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
-    elevation: 3,
+  comingSoon: {
+    fontSize: 12,
+    color: colors.warning,
+    fontWeight: '600',
+    marginTop: 4,
   },
-  detailsTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.text,
-    marginBottom: 16,
+  notesCard: {
+    backgroundColor: colors.cardBackground,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  detailRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  detailLabel: {
+  notesTitle: {
     fontSize: 15,
-    color: colors.textSecondary,
-  },
-  detailValue: {
-    fontSize: 16,
     fontWeight: '600',
     color: colors.text,
+    marginBottom: 12,
   },
-  detailLabelBold: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.text,
+  noteText: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    lineHeight: 20,
+    marginBottom: 4,
   },
-  detailValueBold: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: colors.primary,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: colors.background,
-    marginVertical: 12,
-  },
-  buttonGroup: {
-    gap: 12,
-  },
-  button: {
+  proceedButton: {
+    backgroundColor: colors.primary,
+    borderRadius: 12,
+    padding: 18,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 16,
-    borderRadius: 12,
-    gap: 8,
   },
-  primaryButton: {
-    backgroundColor: colors.primary,
-  },
-  secondaryButton: {
-    backgroundColor: colors.card,
-    borderWidth: 2,
-    borderColor: colors.textSecondary,
-  },
-  buttonDisabled: {
+  proceedButtonDisabled: {
+    backgroundColor: colors.textSecondary,
     opacity: 0.5,
   },
-  buttonText: {
+  proceedButtonText: {
+    color: colors.background,
     fontSize: 16,
-    fontWeight: '600',
-    color: '#ffffff',
+    fontWeight: '700',
+    marginLeft: 8,
   },
 });
