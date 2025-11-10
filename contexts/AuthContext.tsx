@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useMiningConfig } from './MiningConfigContext';
+import { supabase } from '@/app/integrations/supabase/client';
 
 export interface Transaction {
   id: string;
@@ -19,9 +20,9 @@ export interface Transaction {
 }
 
 export interface WithdrawalRestrictions {
-  purchasedAmount: number; // Amount purchased or transferred from external wallet
-  miningEarnings: number; // Earnings from mining
-  commissionEarnings: number; // Earnings from commissions
+  purchasedAmount: number;
+  miningEarnings: number;
+  commissionEarnings: number;
   lastWithdrawalDate?: string;
   withdrawalCount: number;
   canWithdrawEarnings: boolean;
@@ -51,7 +52,7 @@ export interface User {
   withdrawalRestrictions: WithdrawalRestrictions;
   isBlocked?: boolean;
   hasMiningAccess?: boolean;
-  hasFirstPurchase?: boolean; // New field to track first purchase of 100 USDT
+  hasFirstPurchase?: boolean;
 }
 
 interface AuthContextType {
@@ -105,14 +106,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const loadCurrentUser = async () => {
     try {
-      const currentUserId = await AsyncStorage.getItem(STORAGE_KEYS.CURRENT_USER);
-      if (currentUserId) {
-        const usersData = await AsyncStorage.getItem(STORAGE_KEYS.USERS);
-        if (usersData) {
-          const users = JSON.parse(usersData);
-          const foundUser = users.find((u: User) => u.id === currentUserId);
-          if (foundUser) {
-            setUser(foundUser);
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session?.user) {
+        await loadUserData(session.user.id);
+      } else {
+        // Fallback to AsyncStorage for backward compatibility
+        const currentUserId = await AsyncStorage.getItem(STORAGE_KEYS.CURRENT_USER);
+        if (currentUserId) {
+          const usersData = await AsyncStorage.getItem(STORAGE_KEYS.USERS);
+          if (usersData) {
+            const users = JSON.parse(usersData);
+            const foundUser = users.find((u: User) => u.id === currentUserId);
+            if (foundUser) {
+              setUser(foundUser);
+            }
           }
         }
       }
@@ -123,26 +131,109 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const loadUserData = async (userId: string) => {
+    try {
+      const { data: userData, error } = await supabase
+        .from('users')
+        .select(`
+          *,
+          withdrawal_restrictions(*),
+          withdrawal_addresses(*)
+        `)
+        .eq('id', userId)
+        .single();
+
+      if (error) {
+        console.error('Error loading user data:', error);
+        return;
+      }
+
+      if (userData) {
+        // Get transactions
+        const { data: transactions } = await supabase
+          .from('transactions')
+          .select('*')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false })
+          .limit(100);
+
+        // Get referrals count
+        const { count: referralsCount } = await supabase
+          .from('users')
+          .select('id', { count: 'exact', head: true })
+          .eq('referred_by', userId);
+
+        const restrictions = userData.withdrawal_restrictions?.[0] || {
+          purchasedAmount: 0,
+          miningEarnings: 0,
+          commissionEarnings: 0,
+          withdrawalCount: 0,
+          canWithdrawEarnings: false,
+        };
+
+        const addresses = userData.withdrawal_addresses?.reduce((acc: any, addr: any) => {
+          acc[addr.platform] = addr.address;
+          return acc;
+        }, {}) || {};
+
+        const mappedUser: User = {
+          id: userData.id,
+          username: userData.username,
+          email: userData.email,
+          emailVerified: userData.email_verified,
+          balance: parseFloat(userData.balance),
+          miningPower: parseFloat(userData.mining_power),
+          referralCode: userData.referral_code,
+          referredBy: userData.referred_by,
+          referrals: Array(referralsCount || 0).fill(''),
+          referralEarnings: parseFloat(userData.referral_earnings),
+          totalPurchases: parseFloat(userData.total_purchases),
+          createdAt: userData.created_at,
+          uniqueIdentifier: userData.unique_identifier,
+          withdrawalAddresses: addresses,
+          transactions: transactions?.map((tx: any) => ({
+            id: tx.transaction_id,
+            type: tx.type,
+            amount: parseFloat(tx.amount),
+            usdValue: tx.usd_value ? parseFloat(tx.usd_value) : undefined,
+            from: tx.from_identifier,
+            to: tx.to_identifier,
+            commission: tx.commission ? parseFloat(tx.commission) : undefined,
+            commissionRate: tx.commission_rate ? parseFloat(tx.commission_rate) : undefined,
+            description: tx.description,
+            timestamp: tx.created_at,
+            status: tx.status,
+            platform: tx.platform,
+          })) || [],
+          withdrawalRestrictions: {
+            purchasedAmount: parseFloat(restrictions.purchased_amount || 0),
+            miningEarnings: parseFloat(restrictions.mining_earnings || 0),
+            commissionEarnings: parseFloat(restrictions.commission_earnings || 0),
+            lastWithdrawalDate: restrictions.last_withdrawal_date,
+            withdrawalCount: restrictions.withdrawal_count || 0,
+            canWithdrawEarnings: restrictions.can_withdraw_earnings || false,
+            earningsWithdrawalCycleStart: restrictions.earnings_withdrawal_cycle_start,
+          },
+          isBlocked: userData.is_blocked,
+          hasMiningAccess: userData.has_mining_access,
+          hasFirstPurchase: userData.has_first_purchase,
+        };
+
+        setUser(mappedUser);
+      }
+    } catch (error) {
+      console.error('Error loading user data:', error);
+    }
+  };
+
   const refreshUser = async () => {
     if (user) {
-      try {
-        const usersData = await AsyncStorage.getItem(STORAGE_KEYS.USERS);
-        if (usersData) {
-          const users = JSON.parse(usersData);
-          const foundUser = users.find((u: User) => u.id === user.id);
-          if (foundUser) {
-            setUser(foundUser);
-          }
-        }
-      } catch (error) {
-        console.error('Error refreshing user:', error);
-      }
+      await loadUserData(user.id);
     }
   };
 
   const getReferralLink = (): string => {
     if (!user) return '';
-    // Generate unique referral link for the user
     return `https://maxcoin-mxi.app/register?ref=${user.referralCode}`;
   };
 
@@ -150,21 +241,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (!user) return 0;
 
     try {
-      const usersData = await AsyncStorage.getItem(STORAGE_KEYS.USERS);
-      if (!usersData) return 0;
+      const { count } = await supabase
+        .from('users')
+        .select('id', { count: 'exact', head: true })
+        .eq('referred_by', user.id)
+        .or('total_purchases.gt.0,has_mining_access.eq.true');
 
-      const users: User[] = JSON.parse(usersData);
-      
-      // Count referrals who have made purchases (initial package or mining power)
-      let activeCount = 0;
-      for (const refId of user.referrals) {
-        const referral = users.find(u => u.id === refId);
-        if (referral && (referral.totalPurchases > 0 || referral.hasMiningAccess)) {
-          activeCount++;
-        }
-      }
-
-      return activeCount;
+      return count || 0;
     } catch (error) {
       console.error('Error getting active referrals count:', error);
       return 0;
@@ -175,18 +258,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (!user) return;
 
     try {
-      const usersData = await AsyncStorage.getItem(STORAGE_KEYS.USERS);
-      if (!usersData) return;
+      if (!user.hasFirstPurchase && usdAmount >= 100) {
+        const { error } = await supabase
+          .from('users')
+          .update({ has_first_purchase: true })
+          .eq('id', user.id);
 
-      const users: User[] = JSON.parse(usersData);
-      const userIndex = users.findIndex(u => u.id === user.id);
-
-      if (userIndex !== -1) {
-        // Check if this is the first purchase of at least 100 USDT
-        if (!users[userIndex].hasFirstPurchase && usdAmount >= 100) {
-          users[userIndex].hasFirstPurchase = true;
-          await AsyncStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
-          setUser(users[userIndex]);
+        if (!error) {
+          await refreshUser();
           console.log('First purchase of 100 USDT recorded - Mining and Lottery unlocked');
         }
       }
@@ -202,74 +281,90 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     referralCode?: string
   ): Promise<{ success: boolean; message?: string }> => {
     try {
-      const usersData = await AsyncStorage.getItem(STORAGE_KEYS.USERS);
-      const users: User[] = usersData ? JSON.parse(usersData) : [];
+      // Check if username already exists
+      const { data: existingUser } = await supabase
+        .from('users')
+        .select('id')
+        .eq('username', username)
+        .single();
 
-      // Check for duplicate username
-      if (users.some(u => u.username.toLowerCase() === username.toLowerCase())) {
+      if (existingUser) {
         return { success: false, message: 'Username already exists' };
       }
 
-      // Check for duplicate email
-      if (users.some(u => u.email.toLowerCase() === email.toLowerCase())) {
-        return { success: false, message: 'Email already registered' };
+      // Register with Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: 'https://natively.dev/email-confirmed',
+        },
+      });
+
+      if (authError) {
+        return { success: false, message: authError.message };
       }
 
+      if (!authData.user) {
+        return { success: false, message: 'Registration failed' };
+      }
+
+      // Find referrer if referral code provided
       let referredByUserId: string | undefined;
       if (referralCode) {
-        const referrer = users.find(u => u.referralCode === referralCode.toUpperCase());
+        const { data: referrer } = await supabase
+          .from('users')
+          .select('id')
+          .eq('referral_code', referralCode.toUpperCase())
+          .single();
+
         if (referrer) {
           referredByUserId = referrer.id;
         }
       }
 
-      const newUser: User = {
-        id: Date.now().toString(),
-        username,
-        email: email.toLowerCase(),
-        emailVerified: true, // Simulated email verification
-        balance: 0,
-        miningPower: 1,
-        referralCode: generateReferralCode(username),
-        referredBy: referredByUserId,
-        referrals: [],
-        referralEarnings: 0,
-        totalPurchases: 0,
-        createdAt: new Date().toISOString(),
-        uniqueIdentifier: generateUniqueIdentifier(username),
-        withdrawalAddresses: {},
-        transactions: [],
-        withdrawalRestrictions: {
-          purchasedAmount: 0,
-          miningEarnings: 0,
-          commissionEarnings: 0,
-          withdrawalCount: 0,
-          canWithdrawEarnings: false,
-        },
-        isBlocked: false,
-        hasMiningAccess: false,
-        hasFirstPurchase: false, // New users start with no first purchase
-      };
+      // Create user profile
+      const { error: profileError } = await supabase
+        .from('users')
+        .insert({
+          id: authData.user.id,
+          username,
+          email: email.toLowerCase(),
+          email_verified: false,
+          balance: 0,
+          mining_power: 1,
+          referral_code: generateReferralCode(username),
+          referred_by: referredByUserId,
+          referral_earnings: 0,
+          total_purchases: 0,
+          unique_identifier: generateUniqueIdentifier(username),
+          is_blocked: false,
+          has_mining_access: false,
+          has_first_purchase: false,
+        });
 
-      if (referredByUserId) {
-        const referrerIndex = users.findIndex(u => u.id === referredByUserId);
-        if (referrerIndex !== -1) {
-          users[referrerIndex].referrals.push(newUser.id);
-        }
+      if (profileError) {
+        console.error('Profile creation error:', profileError);
+        return { success: false, message: 'Failed to create user profile' };
       }
 
-      const passwordsData = await AsyncStorage.getItem('@maxcoin_passwords');
-      const passwords = passwordsData ? JSON.parse(passwordsData) : {};
-      passwords[newUser.id] = password;
-      await AsyncStorage.setItem('@maxcoin_passwords', JSON.stringify(passwords));
+      // Create withdrawal restrictions record
+      await supabase
+        .from('withdrawal_restrictions')
+        .insert({
+          user_id: authData.user.id,
+          purchased_amount: 0,
+          mining_earnings: 0,
+          commission_earnings: 0,
+          withdrawal_count: 0,
+          can_withdraw_earnings: false,
+        });
 
-      users.push(newUser);
-      await AsyncStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
-      await AsyncStorage.setItem(STORAGE_KEYS.CURRENT_USER, newUser.id);
-
-      setUser(newUser);
-      console.log('User registered:', { username, email, emailVerified: true, referralLink: `https://maxcoin-mxi.app/register?ref=${newUser.referralCode}` });
-      return { success: true };
+      console.log('User registered successfully. Please verify your email.');
+      return { 
+        success: true, 
+        message: 'Registration successful! Please check your email to verify your account.' 
+      };
     } catch (error) {
       console.error('Error registering user:', error);
       return { success: false, message: 'Registration failed' };
@@ -278,35 +373,38 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const login = async (email: string, password: string): Promise<{ success: boolean; message?: string }> => {
     try {
-      const usersData = await AsyncStorage.getItem(STORAGE_KEYS.USERS);
-      if (!usersData) return { success: false, message: 'No users found' };
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-      const users: User[] = JSON.parse(usersData);
-      const foundUser = users.find(u => u.email.toLowerCase() === email.toLowerCase());
+      if (error) {
+        return { success: false, message: error.message };
+      }
 
-      if (!foundUser) return { success: false, message: 'User not found' };
+      if (!data.user) {
+        return { success: false, message: 'Login failed' };
+      }
 
       // Check if user is blocked
-      const blockedUsersData = await AsyncStorage.getItem('@maxcoin_blocked_users');
-      const blockedUsers = blockedUsersData ? JSON.parse(blockedUsersData) : [];
-      if (blockedUsers.includes(foundUser.id)) {
+      const { data: userData } = await supabase
+        .from('users')
+        .select('is_blocked, email_verified')
+        .eq('id', data.user.id)
+        .single();
+
+      if (userData?.is_blocked) {
+        await supabase.auth.signOut();
         return { success: false, message: 'Account has been blocked. Please contact support.' };
       }
 
-      const passwordsData = await AsyncStorage.getItem('@maxcoin_passwords');
-      const passwords = passwordsData ? JSON.parse(passwordsData) : {};
-      
-      if (passwords[foundUser.id] !== password) {
-        return { success: false, message: 'Invalid password' };
-      }
-
-      if (!foundUser.emailVerified) {
+      if (!userData?.email_verified) {
+        await supabase.auth.signOut();
         return { success: false, message: 'Please verify your email before logging in' };
       }
 
-      await AsyncStorage.setItem(STORAGE_KEYS.CURRENT_USER, foundUser.id);
-      setUser(foundUser);
-      console.log('User logged in:', { email, username: foundUser.username });
+      await loadUserData(data.user.id);
+      console.log('User logged in:', { email });
       return { success: true };
     } catch (error) {
       console.error('Error logging in:', error);
@@ -316,6 +414,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const logout = async () => {
     try {
+      await supabase.auth.signOut();
       await AsyncStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
       setUser(null);
     } catch (error) {
@@ -327,42 +426,53 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (!user) return;
 
     try {
-      const usersData = await AsyncStorage.getItem(STORAGE_KEYS.USERS);
-      if (!usersData) return;
+      const newBalance = user.balance + amount;
+      
+      const { error } = await supabase
+        .from('users')
+        .update({ balance: newBalance })
+        .eq('id', user.id);
 
-      const users: User[] = JSON.parse(usersData);
-      const userIndex = users.findIndex(u => u.id === user.id);
+      if (error) {
+        console.error('Balance update error:', error);
+        return;
+      }
 
-      if (userIndex !== -1) {
-        users[userIndex].balance += amount;
-        
-        // Track earnings by type for withdrawal restrictions
-        if (type === 'mining') {
-          users[userIndex].withdrawalRestrictions.miningEarnings += amount;
-        } else if (type === 'commission') {
-          users[userIndex].withdrawalRestrictions.commissionEarnings += amount;
-        } else if (type === 'purchase') {
-          users[userIndex].withdrawalRestrictions.purchasedAmount += amount;
-        }
+      // Update withdrawal restrictions
+      const restrictionField = type === 'mining' ? 'mining_earnings' : 
+                              type === 'commission' ? 'commission_earnings' : 
+                              'purchased_amount';
 
-        // Add transaction
-        const transaction: Transaction = {
-          id: `${type.toUpperCase()}-${Date.now()}-${Math.random().toString(36).substring(2, 9).toUpperCase()}`,
+      const { data: restrictions } = await supabase
+        .from('withdrawal_restrictions')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+
+      if (restrictions) {
+        await supabase
+          .from('withdrawal_restrictions')
+          .update({ 
+            [restrictionField]: (restrictions[restrictionField] || 0) + amount 
+          })
+          .eq('user_id', user.id);
+      }
+
+      // Create transaction
+      const transactionId = `${type.toUpperCase()}-${Date.now()}-${Math.random().toString(36).substring(2, 9).toUpperCase()}`;
+      
+      await supabase
+        .from('transactions')
+        .insert({
+          transaction_id: transactionId,
+          user_id: user.id,
           type: type === 'purchase' ? 'purchase' : type === 'commission' ? 'commission' : 'mining',
           amount: amount,
           description: `${type.charAt(0).toUpperCase() + type.slice(1)} earnings`,
-          timestamp: new Date().toISOString(),
           status: 'completed',
-        };
+        });
 
-        if (!users[userIndex].transactions) {
-          users[userIndex].transactions = [];
-        }
-        users[userIndex].transactions.unshift(transaction);
-
-        await AsyncStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
-        setUser(users[userIndex]);
-      }
+      await refreshUser();
     } catch (error) {
       console.error('Error updating balance:', error);
     }
@@ -374,17 +484,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     const restrictions = user.withdrawalRestrictions;
-    
-    // Purchased/transferred MXI is always available for withdrawal
     const availablePurchased = restrictions.purchasedAmount;
-    
-    // Commission earnings are available immediately
     const availableCommission = restrictions.commissionEarnings;
-    
-    // Mining earnings require 10 active referrals with purchases
-    const canWithdrawMining = checkMiningWithdrawalEligibility(user);
-    const availableMining = canWithdrawMining ? restrictions.miningEarnings : 0;
-    
+    const availableMining = restrictions.canWithdrawEarnings ? restrictions.miningEarnings : 0;
     const totalAvailable = availablePurchased + availableCommission + availableMining;
 
     if (amount > totalAvailable) {
@@ -401,12 +503,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return { canWithdraw: true, availableForWithdrawal: totalAvailable };
   };
 
-  const checkMiningWithdrawalEligibility = (user: User): boolean => {
-    // Mining withdrawals require 10 active referrals with purchases per cycle
-    // This is checked in real-time via getActiveReferralsCount
-    return user.withdrawalRestrictions.canWithdrawEarnings;
-  };
-
   const withdrawMXI = async (
     platform: string,
     address: string,
@@ -417,93 +513,41 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
-      // Check withdrawal eligibility
       const eligibility = canWithdrawAmount(amount);
       if (!eligibility.canWithdraw) {
         return { success: false, message: eligibility.message };
       }
 
-      const usersData = await AsyncStorage.getItem(STORAGE_KEYS.USERS);
-      if (!usersData) {
-        return { success: false, message: 'Failed to load users data' };
+      // Call Supabase Edge Function for Binance withdrawal
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        return { success: false, message: 'Not authenticated' };
       }
 
-      const users: User[] = JSON.parse(usersData);
-      const userIndex = users.findIndex(u => u.id === user.id);
-
-      if (userIndex === -1) {
-        return { success: false, message: 'User not found' };
-      }
-
-      if (users[userIndex].balance < amount) {
-        return { success: false, message: 'Insufficient balance' };
-      }
-
-      // Deduct from balance
-      users[userIndex].balance -= amount;
-
-      // Deduct from appropriate restriction categories
-      let remainingAmount = amount;
-      const restrictions = users[userIndex].withdrawalRestrictions;
-
-      // First deduct from purchased amount (always available)
-      if (restrictions.purchasedAmount > 0) {
-        const deductFromPurchased = Math.min(remainingAmount, restrictions.purchasedAmount);
-        restrictions.purchasedAmount -= deductFromPurchased;
-        remainingAmount -= deductFromPurchased;
-      }
-
-      // Then deduct from commission earnings (always available)
-      if (remainingAmount > 0 && restrictions.commissionEarnings > 0) {
-        const deductFromCommission = Math.min(remainingAmount, restrictions.commissionEarnings);
-        restrictions.commissionEarnings -= deductFromCommission;
-        remainingAmount -= deductFromCommission;
-      }
-
-      // Finally deduct from mining earnings (if eligible)
-      if (remainingAmount > 0 && checkMiningWithdrawalEligibility(users[userIndex])) {
-        if (restrictions.miningEarnings > 0) {
-          const deductFromMining = Math.min(remainingAmount, restrictions.miningEarnings);
-          restrictions.miningEarnings -= deductFromMining;
-          remainingAmount -= deductFromMining;
+      const response = await fetch(
+        `${supabase.supabaseUrl}/functions/v1/binance-withdraw`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            amount,
+            address,
+            network: 'BSC',
+          }),
         }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        return { success: false, message: result.error || 'Withdrawal failed' };
       }
 
-      // Update withdrawal tracking
-      restrictions.withdrawalCount += 1;
-      restrictions.lastWithdrawalDate = new Date().toISOString();
-      if (!restrictions.earningsWithdrawalCycleStart) {
-        restrictions.earningsWithdrawalCycleStart = new Date().toISOString();
-      }
-
-      const withdrawalTransaction: Transaction = {
-        id: `WTH-${Date.now()}-${Math.random().toString(36).substring(2, 9).toUpperCase()}`,
-        type: 'withdrawal',
-        amount: -amount,
-        to: address,
-        platform: platform,
-        description: `Withdrawal to ${platform} (Processed within 48 hours)`,
-        timestamp: new Date().toISOString(),
-        status: 'pending',
-      };
-
-      if (!users[userIndex].transactions) users[userIndex].transactions = [];
-      users[userIndex].transactions.unshift(withdrawalTransaction);
-
-      await AsyncStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
-      setUser(users[userIndex]);
-
-      console.log('Withdrawal initiated:', {
-        transactionId: withdrawalTransaction.id,
-        user: user.username,
-        uniqueId: user.uniqueIdentifier,
-        platform,
-        address,
-        amount,
-        withdrawalCount: restrictions.withdrawalCount,
-        timestamp: new Date().toISOString(),
-      });
-
+      await refreshUser();
       return { success: true };
     } catch (error) {
       console.error('Error withdrawing MXI:', error);
@@ -515,20 +559,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (!user) return;
 
     try {
-      const usersData = await AsyncStorage.getItem(STORAGE_KEYS.USERS);
-      if (!usersData) return;
+      await supabase
+        .from('withdrawal_addresses')
+        .upsert({
+          user_id: user.id,
+          platform: platform.toLowerCase(),
+          address: address,
+        }, {
+          onConflict: 'user_id,platform',
+        });
 
-      const users: User[] = JSON.parse(usersData);
-      const userIndex = users.findIndex(u => u.id === user.id);
-
-      if (userIndex !== -1) {
-        if (!users[userIndex].withdrawalAddresses) {
-          users[userIndex].withdrawalAddresses = {};
-        }
-        users[userIndex].withdrawalAddresses[platform.toLowerCase()] = address;
-        await AsyncStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
-        setUser(users[userIndex]);
-      }
+      await refreshUser();
     } catch (error) {
       console.error('Error updating withdrawal address:', error);
     }
@@ -536,12 +577,41 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const getUserByReferralCode = async (code: string): Promise<User | null> => {
     try {
-      const usersData = await AsyncStorage.getItem(STORAGE_KEYS.USERS);
-      if (!usersData) return null;
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('referral_code', code.toUpperCase())
+        .single();
 
-      const users: User[] = JSON.parse(usersData);
-      const foundUser = users.find(u => u.referralCode === code.toUpperCase());
-      return foundUser || null;
+      if (error || !data) return null;
+
+      return {
+        id: data.id,
+        username: data.username,
+        email: data.email,
+        emailVerified: data.email_verified,
+        balance: parseFloat(data.balance),
+        miningPower: parseFloat(data.mining_power),
+        referralCode: data.referral_code,
+        referredBy: data.referred_by,
+        referrals: [],
+        referralEarnings: parseFloat(data.referral_earnings),
+        totalPurchases: parseFloat(data.total_purchases),
+        createdAt: data.created_at,
+        uniqueIdentifier: data.unique_identifier,
+        withdrawalAddresses: {},
+        transactions: [],
+        withdrawalRestrictions: {
+          purchasedAmount: 0,
+          miningEarnings: 0,
+          commissionEarnings: 0,
+          withdrawalCount: 0,
+          canWithdrawEarnings: false,
+        },
+        isBlocked: data.is_blocked,
+        hasMiningAccess: data.has_mining_access,
+        hasFirstPurchase: data.has_first_purchase,
+      };
     } catch (error) {
       console.error('Error finding user by referral code:', error);
       return null;
@@ -559,168 +629,43 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
-      const usersData = await AsyncStorage.getItem(STORAGE_KEYS.USERS);
-      if (!usersData) {
-        return { success: false, message: 'Failed to load users data' };
-      }
-
-      const users: User[] = JSON.parse(usersData);
-      const senderIndex = users.findIndex(u => u.id === user.id);
-      const recipient = users.find(u => u.referralCode === recipientCode.toUpperCase());
-
-      if (!recipient) {
-        return { success: false, message: 'Recipient not found' };
-      }
-
-      if (recipient.id === user.id) {
-        return { success: false, message: 'Cannot transfer to yourself' };
-      }
-
-      if (senderIndex === -1) {
-        return { success: false, message: 'Sender not found' };
-      }
-
-      if (users[senderIndex].balance < amount) {
-        return { success: false, message: 'Insufficient balance' };
-      }
-
-      const config = miningConfigContext.config;
-      const commissionRate = config.level1Commission;
-      const commissionAmount = (amount * commissionRate) / 100;
-      const recipientReceives = amount - commissionAmount;
-
-      users[senderIndex].balance -= amount;
-
-      const recipientIndex = users.findIndex(u => u.id === recipient.id);
-      users[recipientIndex].balance += recipientReceives;
+      const { data: { session } } = await supabase.auth.getSession();
       
-      // Track as purchased amount for recipient (can be withdrawn immediately)
-      users[recipientIndex].withdrawalRestrictions.purchasedAmount += recipientReceives;
+      if (!session) {
+        return { success: false, message: 'Not authenticated' };
+      }
 
-      const transactionId = `TXN-${Date.now()}-${Math.random().toString(36).substring(2, 9).toUpperCase()}`;
-      
-      const senderTransaction: Transaction = {
-        id: transactionId,
-        type: 'transfer',
-        amount: -amount,
-        usdValue: usdValue,
-        from: user.uniqueIdentifier,
-        to: recipient.uniqueIdentifier,
-        commission: commissionAmount,
-        commissionRate: commissionRate,
-        description: description || 'MXI Transfer',
-        timestamp: new Date().toISOString(),
-        status: 'completed',
-      };
-
-      const recipientTransaction: Transaction = {
-        id: transactionId,
-        type: 'transfer',
-        amount: recipientReceives,
-        usdValue: usdValue * (recipientReceives / amount),
-        from: user.uniqueIdentifier,
-        to: recipient.uniqueIdentifier,
-        commission: commissionAmount,
-        commissionRate: commissionRate,
-        description: description || 'MXI Transfer',
-        timestamp: new Date().toISOString(),
-        status: 'completed',
-      };
-
-      if (!users[senderIndex].transactions) users[senderIndex].transactions = [];
-      if (!users[recipientIndex].transactions) users[recipientIndex].transactions = [];
-      
-      users[senderIndex].transactions.unshift(senderTransaction);
-      users[recipientIndex].transactions.unshift(recipientTransaction);
-
-      // Distribute commissions (available immediately for withdrawal)
-      if (users[senderIndex].referredBy) {
-        const level1Index = users.findIndex(u => u.id === users[senderIndex].referredBy);
-        if (level1Index !== -1) {
-          const level1Commission = commissionAmount * 0.5;
-          users[level1Index].balance += level1Commission;
-          users[level1Index].referralEarnings += level1Commission;
-          users[level1Index].withdrawalRestrictions.commissionEarnings += level1Commission;
-
-          const commissionTransaction: Transaction = {
-            id: `COM-${Date.now()}-${Math.random().toString(36).substring(2, 9).toUpperCase()}`,
-            type: 'commission',
-            amount: level1Commission,
-            from: user.uniqueIdentifier,
-            description: 'Level 1 Commission from transfer',
-            timestamp: new Date().toISOString(),
-            status: 'completed',
-          };
-          
-          if (!users[level1Index].transactions) users[level1Index].transactions = [];
-          users[level1Index].transactions.unshift(commissionTransaction);
-
-          if (users[level1Index].referredBy) {
-            const level2Index = users.findIndex(u => u.id === users[level1Index].referredBy);
-            if (level2Index !== -1) {
-              const level2Commission = commissionAmount * 0.3;
-              users[level2Index].balance += level2Commission;
-              users[level2Index].referralEarnings += level2Commission;
-              users[level2Index].withdrawalRestrictions.commissionEarnings += level2Commission;
-
-              const level2CommissionTransaction: Transaction = {
-                id: `COM-${Date.now()}-${Math.random().toString(36).substring(2, 9).toUpperCase()}`,
-                type: 'commission',
-                amount: level2Commission,
-                from: user.uniqueIdentifier,
-                description: 'Level 2 Commission from transfer',
-                timestamp: new Date().toISOString(),
-                status: 'completed',
-              };
-              
-              if (!users[level2Index].transactions) users[level2Index].transactions = [];
-              users[level2Index].transactions.unshift(level2CommissionTransaction);
-
-              if (users[level2Index].referredBy) {
-                const level3Index = users.findIndex(u => u.id === users[level2Index].referredBy);
-                if (level3Index !== -1) {
-                  const level3Commission = commissionAmount * 0.2;
-                  users[level3Index].balance += level3Commission;
-                  users[level3Index].referralEarnings += level3Commission;
-                  users[level3Index].withdrawalRestrictions.commissionEarnings += level3Commission;
-
-                  const level3CommissionTransaction: Transaction = {
-                    id: `COM-${Date.now()}-${Math.random().toString(36).substring(2, 9).toUpperCase()}`,
-                    type: 'commission',
-                    amount: level3Commission,
-                    from: user.uniqueIdentifier,
-                    description: 'Level 3 Commission from transfer',
-                    timestamp: new Date().toISOString(),
-                    status: 'completed',
-                  };
-                  
-                  if (!users[level3Index].transactions) users[level3Index].transactions = [];
-                  users[level3Index].transactions.unshift(level3CommissionTransaction);
-                }
-              }
-            }
-          }
+      const response = await fetch(
+        `${supabase.supabaseUrl}/functions/v1/transfer-mxi`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            recipientCode,
+            amount,
+            usdValue,
+            description,
+          }),
         }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        return { success: false, message: result.error || 'Transfer failed' };
       }
 
-      await AsyncStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
-      setUser(users[senderIndex]);
+      await refreshUser();
 
-      console.log('Real MXI Transfer completed:', {
-        transactionId,
-        from: user.username,
-        to: recipient.username,
-        amount,
-        recipientReceives,
-        commission: commissionAmount,
-        usdValue,
-        timestamp: new Date().toISOString(),
-      });
+      console.log('MXI Transfer completed:', result);
 
       return {
         success: true,
-        recipientReceives,
-        commission: commissionAmount,
+        recipientReceives: result.recipientReceives,
+        commission: result.commission,
       };
     } catch (error) {
       console.error('Error transferring MXI:', error);
@@ -732,109 +677,52 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (!user) return;
 
     try {
-      const usersData = await AsyncStorage.getItem(STORAGE_KEYS.USERS);
-      if (!usersData) return;
+      const config = miningConfigContext.config;
+      const newBalance = user.balance + amount;
+      const newTotalPurchases = user.totalPurchases + amount;
+      const powerIncrease = (newTotalPurchases / config.powerIncreaseThreshold) * (config.powerIncreasePercent / 100);
+      const newMiningPower = 1 + powerIncrease;
 
-      const users: User[] = JSON.parse(usersData);
-      const userIndex = users.findIndex(u => u.id === user.id);
+      await supabase
+        .from('users')
+        .update({ 
+          balance: newBalance,
+          total_purchases: newTotalPurchases,
+          mining_power: newMiningPower,
+        })
+        .eq('id', user.id);
 
-      if (userIndex !== -1) {
-        const config = miningConfigContext.config;
-        
-        users[userIndex].balance += amount;
-        users[userIndex].totalPurchases += amount;
-        
-        // Track as purchased amount (can be withdrawn immediately)
-        users[userIndex].withdrawalRestrictions.purchasedAmount += amount;
-        
-        const powerIncrease = (users[userIndex].totalPurchases / config.powerIncreaseThreshold) * (config.powerIncreasePercent / 100);
-        users[userIndex].miningPower = 1 + powerIncrease;
+      // Update withdrawal restrictions
+      const { data: restrictions } = await supabase
+        .from('withdrawal_restrictions')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
 
-        const purchaseTransaction: Transaction = {
-          id: `PUR-${Date.now()}-${Math.random().toString(36).substring(2, 9).toUpperCase()}`,
+      if (restrictions) {
+        await supabase
+          .from('withdrawal_restrictions')
+          .update({ 
+            purchased_amount: (restrictions.purchased_amount || 0) + amount 
+          })
+          .eq('user_id', user.id);
+      }
+
+      // Create transaction
+      const transactionId = `PUR-${Date.now()}-${Math.random().toString(36).substring(2, 9).toUpperCase()}`;
+      
+      await supabase
+        .from('transactions')
+        .insert({
+          transaction_id: transactionId,
+          user_id: user.id,
           type: 'purchase',
           amount: amount,
           description: 'MXI Purchase',
-          timestamp: new Date().toISOString(),
           status: 'completed',
-        };
+        });
 
-        if (!users[userIndex].transactions) users[userIndex].transactions = [];
-        users[userIndex].transactions.unshift(purchaseTransaction);
-
-        // Distribute referral commissions (available immediately for withdrawal)
-        if (users[userIndex].referredBy) {
-          const level1Index = users.findIndex(u => u.id === users[userIndex].referredBy);
-          if (level1Index !== -1) {
-            const level1Commission = amount * (config.level1Commission / 100);
-            users[level1Index].balance += level1Commission;
-            users[level1Index].referralEarnings += level1Commission;
-            users[level1Index].withdrawalRestrictions.commissionEarnings += level1Commission;
-
-            const commissionTransaction: Transaction = {
-              id: `COM-${Date.now()}-${Math.random().toString(36).substring(2, 9).toUpperCase()}`,
-              type: 'commission',
-              amount: level1Commission,
-              from: users[userIndex].uniqueIdentifier,
-              description: 'Level 1 Commission from purchase',
-              timestamp: new Date().toISOString(),
-              status: 'completed',
-            };
-            
-            if (!users[level1Index].transactions) users[level1Index].transactions = [];
-            users[level1Index].transactions.unshift(commissionTransaction);
-
-            if (users[level1Index].referredBy) {
-              const level2Index = users.findIndex(u => u.id === users[level1Index].referredBy);
-              if (level2Index !== -1) {
-                const level2Commission = amount * (config.level2Commission / 100);
-                users[level2Index].balance += level2Commission;
-                users[level2Index].referralEarnings += level2Commission;
-                users[level2Index].withdrawalRestrictions.commissionEarnings += level2Commission;
-
-                const level2CommissionTransaction: Transaction = {
-                  id: `COM-${Date.now()}-${Math.random().toString(36).substring(2, 9).toUpperCase()}`,
-                  type: 'commission',
-                  amount: level2Commission,
-                  from: users[userIndex].uniqueIdentifier,
-                  description: 'Level 2 Commission from purchase',
-                  timestamp: new Date().toISOString(),
-                  status: 'completed',
-                };
-                
-                if (!users[level2Index].transactions) users[level2Index].transactions = [];
-                users[level2Index].transactions.unshift(level2CommissionTransaction);
-
-                if (users[level2Index].referredBy) {
-                  const level3Index = users.findIndex(u => u.id === users[level2Index].referredBy);
-                  if (level3Index !== -1) {
-                    const level3Commission = amount * (config.level3Commission / 100);
-                    users[level3Index].balance += level3Commission;
-                    users[level3Index].referralEarnings += level3Commission;
-                    users[level3Index].withdrawalRestrictions.commissionEarnings += level3Commission;
-
-                    const level3CommissionTransaction: Transaction = {
-                      id: `COM-${Date.now()}-${Math.random().toString(36).substring(2, 9).toUpperCase()}`,
-                      type: 'commission',
-                      amount: level3Commission,
-                      from: users[userIndex].uniqueIdentifier,
-                      description: 'Level 3 Commission from purchase',
-                      timestamp: new Date().toISOString(),
-                      status: 'completed',
-                    };
-                    
-                    if (!users[level3Index].transactions) users[level3Index].transactions = [];
-                    users[level3Index].transactions.unshift(level3CommissionTransaction);
-                  }
-                }
-              }
-            }
-          }
-        }
-
-        await AsyncStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
-        setUser(users[userIndex]);
-      }
+      await refreshUser();
     } catch (error) {
       console.error('Error purchasing maxcoin:', error);
     }
@@ -844,19 +732,34 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (!user) return;
 
     try {
-      const usersData = await AsyncStorage.getItem(STORAGE_KEYS.USERS);
-      if (!usersData) return;
+      const newBalance = user.balance + amount;
+      const newReferralEarnings = user.referralEarnings + amount;
 
-      const users: User[] = JSON.parse(usersData);
-      const userIndex = users.findIndex(u => u.id === user.id);
+      await supabase
+        .from('users')
+        .update({ 
+          balance: newBalance,
+          referral_earnings: newReferralEarnings,
+        })
+        .eq('id', user.id);
 
-      if (userIndex !== -1) {
-        users[userIndex].referralEarnings += amount;
-        users[userIndex].balance += amount;
-        users[userIndex].withdrawalRestrictions.commissionEarnings += amount;
-        await AsyncStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
-        setUser(users[userIndex]);
+      // Update commission earnings in restrictions
+      const { data: restrictions } = await supabase
+        .from('withdrawal_restrictions')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+
+      if (restrictions) {
+        await supabase
+          .from('withdrawal_restrictions')
+          .update({ 
+            commission_earnings: (restrictions.commission_earnings || 0) + amount 
+          })
+          .eq('user_id', user.id);
       }
+
+      await refreshUser();
     } catch (error) {
       console.error('Error adding referral earnings:', error);
     }

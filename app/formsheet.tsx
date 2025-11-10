@@ -86,26 +86,37 @@ export default function FormSheetModal() {
       return;
     }
 
+    // Only Binance is currently supported
+    if (selectedPlatform !== 'binance') {
+      Alert.alert(
+        'Coming Soon',
+        'Only Binance withdrawals are currently supported. Other platforms will be available soon.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
     setIsProcessing(true);
     
     try {
       // Save withdrawal address for future use
       await updateWithdrawalAddress(selectedPlatform, withdrawalAddress);
 
-      // Execute withdrawal
+      // Execute withdrawal through Supabase Edge Function
       const result = await withdrawMXI(selectedPlatform, withdrawalAddress, amount);
 
       if (result.success) {
         Alert.alert(
-          'Withdrawal Successful',
+          'Withdrawal Initiated',
           `Your withdrawal of ${amount.toFixed(6)} MXI has been initiated!\n\n` +
           `Platform: ${platforms.find(p => p.id === selectedPlatform)?.name}\n` +
           `Address: ${withdrawalAddress.substring(0, 20)}...\n` +
           `You will receive: ${finalAmount.toFixed(6)} MXI\n` +
           `Network fee: ${networkFee.toFixed(6)} MXI\n` +
           `USD Value: $${usdValue.toFixed(2)}\n\n` +
-          `Transaction ID: ${Date.now().toString(36).toUpperCase()}\n\n` +
-          `Your unique identifier: ${user.uniqueIdentifier}`,
+          `Processing time: 24-48 hours\n\n` +
+          `Your unique identifier: ${user.uniqueIdentifier}\n\n` +
+          `You will receive a confirmation email once the withdrawal is processed.`,
           [
             { 
               text: 'OK', 
@@ -148,7 +159,6 @@ export default function FormSheetModal() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* User Identifier Card */}
         <View style={styles.identifierCard}>
           <View style={styles.identifierHeader}>
             <IconSymbol name="person.badge.key.fill" size={20} color={colors.primary} />
@@ -157,15 +167,13 @@ export default function FormSheetModal() {
           <Text style={styles.identifierValue}>{user.uniqueIdentifier}</Text>
         </View>
 
-        {/* Info Card */}
         <View style={styles.infoCard}>
           <IconSymbol name="info.circle.fill" size={24} color={colors.primary} />
           <Text style={styles.infoText}>
-            Withdraw your mined Maxcoin MXI to supported platforms. All withdrawals are real transactions with unique IDs.
+            Withdraw your Maxcoin MXI to Binance. All withdrawals are processed through secure blockchain transactions.
           </Text>
         </View>
 
-        {/* Platform Selection */}
         <View style={styles.formSection}>
           <Text style={styles.label}>Select Platform</Text>
           <View style={styles.platformGrid}>
@@ -175,14 +183,18 @@ export default function FormSheetModal() {
                 style={[
                   styles.platformCard,
                   selectedPlatform === platform.id && styles.platformCardSelected,
+                  platform.id !== 'binance' && styles.platformCardDisabled,
                 ]}
                 onPress={() => {
-                  setSelectedPlatform(platform.id);
-                  // Pre-fill saved address if available
-                  if (user.withdrawalAddresses && user.withdrawalAddresses[platform.id]) {
-                    setWithdrawalAddress(user.withdrawalAddresses[platform.id] || '');
+                  if (platform.id === 'binance') {
+                    setSelectedPlatform(platform.id);
+                    if (user.withdrawalAddresses && user.withdrawalAddresses[platform.id]) {
+                      setWithdrawalAddress(user.withdrawalAddresses[platform.id] || '');
+                    } else {
+                      setWithdrawalAddress('');
+                    }
                   } else {
-                    setWithdrawalAddress('');
+                    Alert.alert('Coming Soon', 'This platform will be available soon.');
                   }
                 }}
               >
@@ -197,6 +209,9 @@ export default function FormSheetModal() {
                 ]}>
                   {platform.name}
                 </Text>
+                {platform.id !== 'binance' && (
+                  <Text style={styles.comingSoon}>Soon</Text>
+                )}
                 {selectedPlatform === platform.id && (
                   <View style={styles.selectedBadge}>
                     <IconSymbol name="checkmark.circle.fill" size={20} color={colors.success} />
@@ -207,7 +222,6 @@ export default function FormSheetModal() {
           </View>
         </View>
 
-        {/* Balance Display */}
         <View style={styles.balanceCard}>
           <Text style={styles.balanceLabel}>Available Balance</Text>
           <Text style={styles.balanceAmount}>{user.balance.toFixed(6)} MXI</Text>
@@ -218,7 +232,6 @@ export default function FormSheetModal() {
           )}
         </View>
 
-        {/* Withdrawal Form */}
         <View style={styles.formSection}>
           <Text style={styles.label}>Withdrawal Amount</Text>
           <View style={styles.inputContainer}>
@@ -242,13 +255,13 @@ export default function FormSheetModal() {
 
         <View style={styles.formSection}>
           <Text style={styles.label}>
-            {platforms.find(p => p.id === selectedPlatform)?.name} Wallet Address
+            {platforms.find(p => p.id === selectedPlatform)?.name} Wallet Address (BSC Network)
           </Text>
           <TextInput
             style={[styles.input, styles.addressInput]}
             value={withdrawalAddress}
             onChangeText={setWithdrawalAddress}
-            placeholder={`Enter your ${platforms.find(p => p.id === selectedPlatform)?.name} wallet address`}
+            placeholder={`Enter your ${platforms.find(p => p.id === selectedPlatform)?.name} BSC wallet address`}
             placeholderTextColor={colors.textSecondary}
             multiline
             numberOfLines={3}
@@ -258,7 +271,6 @@ export default function FormSheetModal() {
           </Text>
         </View>
 
-        {/* Fee Information */}
         {amount > 0 && (
           <View style={styles.feeCard}>
             <View style={styles.feeRow}>
@@ -293,16 +305,15 @@ export default function FormSheetModal() {
           </View>
         )}
 
-        {/* Action Buttons */}
         <View style={styles.buttonGroup}>
           <Pressable 
             style={[
               styles.button, 
               styles.primaryButton,
-              (isProcessing || amount <= 0 || !withdrawalAddress.trim()) && styles.buttonDisabled
+              (isProcessing || amount <= 0 || !withdrawalAddress.trim() || selectedPlatform !== 'binance') && styles.buttonDisabled
             ]}
             onPress={handleWithdraw}
-            disabled={isProcessing || amount <= 0 || !withdrawalAddress.trim()}
+            disabled={isProcessing || amount <= 0 || !withdrawalAddress.trim() || selectedPlatform !== 'binance'}
           >
             {isProcessing ? (
               <Text style={styles.buttonText}>Processing...</Text>
@@ -323,11 +334,10 @@ export default function FormSheetModal() {
           </Pressable>
         </View>
 
-        {/* Security Notice */}
         <View style={styles.securityNotice}>
           <IconSymbol name="lock.shield.fill" size={20} color={colors.success} />
           <Text style={styles.securityText}>
-            Your transaction is secured with end-to-end encryption. All withdrawals are real and traceable.
+            Your transaction is secured with blockchain technology. All withdrawals are processed within 24-48 hours.
           </Text>
         </View>
       </ScrollView>
@@ -433,11 +443,20 @@ const styles = StyleSheet.create({
     borderColor: colors.primary,
     backgroundColor: colors.primary + '10',
   },
+  platformCardDisabled: {
+    opacity: 0.5,
+  },
   platformName: {
     fontSize: 14,
     fontWeight: '600',
     color: colors.text,
     marginTop: 8,
+  },
+  comingSoon: {
+    fontSize: 10,
+    color: colors.warning,
+    fontWeight: '600',
+    marginTop: 4,
   },
   selectedBadge: {
     position: 'absolute',

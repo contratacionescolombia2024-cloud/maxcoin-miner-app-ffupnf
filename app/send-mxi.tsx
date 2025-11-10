@@ -18,7 +18,7 @@ import { useMiningConfig } from '@/contexts/MiningConfigContext';
 import { useLocalization } from '@/contexts/LocalizationContext';
 
 export default function SendMXIScreen() {
-  const { user, updateBalance } = useAuth();
+  const { user, transferMXI } = useAuth();
   const { mxiRate, convertMXIToUSD, isConnected } = useBinance();
   const { config } = useMiningConfig();
   const { t } = useLocalization();
@@ -31,7 +31,6 @@ export default function SendMXIScreen() {
   const mxiAmount = parseFloat(amount) || 0;
   const usdValue = convertMXIToUSD(mxiAmount);
   
-  // Calculate commission (using Level 1 commission rate as the "sale" commission)
   const commissionRate = config.level1Commission;
   const commissionAmount = (mxiAmount * commissionRate) / 100;
   const recipientReceives = mxiAmount - commissionAmount;
@@ -39,75 +38,59 @@ export default function SendMXIScreen() {
   const handleSendMXI = async () => {
     if (!user) return;
 
-    // Validation
     if (!recipientCode.trim()) {
-      Alert.alert(t('common.error'), t('sendMxi.enterRecipientCode'));
+      Alert.alert(t('common.error'), 'Please enter recipient referral code');
       return;
     }
 
     if (!amount || isNaN(mxiAmount) || mxiAmount <= 0) {
-      Alert.alert(t('common.error'), t('sendMxi.enterValidAmount'));
+      Alert.alert(t('common.error'), 'Please enter a valid amount');
       return;
     }
 
     if (mxiAmount > user.balance) {
-      Alert.alert(t('common.error'), t('sendMxi.insufficientBalance'));
+      Alert.alert(t('common.error'), 'Insufficient balance');
       return;
     }
 
     if (!isConnected || !mxiRate) {
-      Alert.alert(t('common.error'), t('sendMxi.exchangeRateUnavailable'));
+      Alert.alert(t('common.error'), 'Exchange rate unavailable. Please try again.');
       return;
     }
 
     setIsProcessing(true);
 
     try {
-      // Simulate finding recipient by referral code
-      // In production, this would query your backend
-      const recipientFound = recipientCode.length >= 6;
-
-      if (!recipientFound) {
-        Alert.alert(t('common.error'), t('sendMxi.recipientNotFound'));
-        setIsProcessing(false);
-        return;
-      }
-
-      // Deduct from sender's balance
-      await updateBalance(-mxiAmount);
-
-      // Show success with real-time exchange rate
-      Alert.alert(
-        t('sendMxi.transferSuccess'),
-        t('sendMxi.transferSuccessMessage', {
-          amount: mxiAmount.toFixed(6),
-          usdValue: usdValue.toFixed(2),
-          recipient: recipientCode,
-          recipientReceives: recipientReceives.toFixed(6),
-          commission: commissionAmount.toFixed(6),
-          commissionRate: commissionRate,
-          exchangeRate: mxiRate.price.toFixed(2),
-        }),
-        [
-          {
-            text: t('common.ok'),
-            onPress: () => router.back(),
-          },
-        ]
+      const result = await transferMXI(
+        recipientCode,
+        mxiAmount,
+        usdValue,
+        description || undefined
       );
 
-      console.log('MXI Transfer:', {
-        from: user.username,
-        to: recipientCode,
-        amount: mxiAmount,
-        usdValue: usdValue,
-        commission: commissionAmount,
-        exchangeRate: mxiRate.price,
-        timestamp: new Date().toISOString(),
-      });
+      if (result.success) {
+        Alert.alert(
+          'Transfer Successful',
+          `Successfully transferred ${mxiAmount.toFixed(6)} MXI!\n\n` +
+          `Recipient receives: ${result.recipientReceives?.toFixed(6)} MXI\n` +
+          `Commission: ${result.commission?.toFixed(6)} MXI (${commissionRate}%)\n` +
+          `USD Value: $${usdValue.toFixed(2)}\n` +
+          `Exchange Rate: 1 MXI = $${mxiRate.price.toFixed(2)}\n\n` +
+          `Transaction ID: TXN-${Date.now().toString(36).toUpperCase()}\n\n` +
+          `Your unique identifier: ${user.uniqueIdentifier}`,
+          [
+            {
+              text: 'OK',
+              onPress: () => router.back(),
+            },
+          ]
+        );
+      } else {
+        Alert.alert(t('common.error'), result.message || 'Transfer failed');
+      }
     } catch (error) {
       console.error('Error sending MXI:', error);
-      Alert.alert(t('common.error'), t('sendMxi.transferFailed'));
+      Alert.alert(t('common.error'), 'Transfer failed. Please try again.');
     } finally {
       setIsProcessing(false);
     }
@@ -120,19 +103,17 @@ export default function SendMXIScreen() {
   return (
     <ScrollView style={styles.container}>
       <View style={styles.content}>
-        {/* Header */}
         <View style={styles.header}>
           <IconSymbol name="arrow.left.arrow.right.circle.fill" size={80} color={colors.primary} />
-          <Text style={styles.title}>{t('sendMxi.title')}</Text>
-          <Text style={styles.subtitle}>{t('sendMxi.subtitle')}</Text>
+          <Text style={styles.title}>Send MXI</Text>
+          <Text style={styles.subtitle}>Transfer MXI to another user using their unique referral code</Text>
         </View>
 
-        {/* Exchange Rate Card */}
         {isConnected && mxiRate && (
           <View style={styles.rateCard}>
             <View style={styles.rateHeader}>
               <IconSymbol name="chart.line.uptrend.xyaxis" size={24} color={colors.success} />
-              <Text style={styles.rateTitle}>{t('sendMxi.currentExchangeRate')}</Text>
+              <Text style={styles.rateTitle}>Current Exchange Rate</Text>
             </View>
             <View style={styles.rateContent}>
               <Text style={styles.rateValue}>
@@ -152,7 +133,7 @@ export default function SendMXIScreen() {
               </View>
             </View>
             <Text style={styles.rateUpdate}>
-              {t('sendMxi.lastUpdate')}: {mxiRate.lastUpdate.toLocaleTimeString()}
+              Last update: {mxiRate.lastUpdate.toLocaleTimeString()}
             </Text>
           </View>
         )}
@@ -160,13 +141,12 @@ export default function SendMXIScreen() {
         {!isConnected && (
           <View style={styles.warningCard}>
             <IconSymbol name="exclamationmark.triangle.fill" size={24} color={colors.danger} />
-            <Text style={styles.warningText}>{t('sendMxi.notConnectedWarning')}</Text>
+            <Text style={styles.warningText}>Not connected to Binance. Exchange rates unavailable.</Text>
           </View>
         )}
 
-        {/* Balance Card */}
         <View style={styles.balanceCard}>
-          <Text style={styles.balanceLabel}>{t('sendMxi.availableBalance')}</Text>
+          <Text style={styles.balanceLabel}>Available Balance</Text>
           <Text style={styles.balanceAmount}>{user.balance.toFixed(6)} MXI</Text>
           {isConnected && mxiRate && (
             <Text style={styles.balanceUSD}>
@@ -175,16 +155,15 @@ export default function SendMXIScreen() {
           )}
         </View>
 
-        {/* Transfer Form */}
         <View style={styles.formSection}>
-          <Text style={styles.label}>{t('sendMxi.recipientReferralCode')}</Text>
+          <Text style={styles.label}>Recipient Referral Code</Text>
           <View style={styles.inputContainer}>
             <IconSymbol name="person.circle.fill" size={24} color={colors.textSecondary} />
             <TextInput
               style={styles.input}
               value={recipientCode}
               onChangeText={setRecipientCode}
-              placeholder={t('sendMxi.enterRecipientCode')}
+              placeholder="Enter recipient's referral code"
               placeholderTextColor={colors.textSecondary}
               autoCapitalize="characters"
             />
@@ -192,7 +171,7 @@ export default function SendMXIScreen() {
         </View>
 
         <View style={styles.formSection}>
-          <Text style={styles.label}>{t('sendMxi.amount')}</Text>
+          <Text style={styles.label}>Amount</Text>
           <View style={styles.inputContainer}>
             <IconSymbol name="bitcoinsign.circle.fill" size={24} color={colors.primary} />
             <TextInput
@@ -207,44 +186,43 @@ export default function SendMXIScreen() {
           </View>
           {mxiAmount > 0 && isConnected && mxiRate && (
             <Text style={styles.helperText}>
-              ≈ ${usdValue.toFixed(2)} USD {t('sendMxi.atCurrentRate')}
+              ≈ ${usdValue.toFixed(2)} USD at current rate
             </Text>
           )}
         </View>
 
         <View style={styles.formSection}>
-          <Text style={styles.label}>{t('sendMxi.description')} ({t('sendMxi.optional')})</Text>
+          <Text style={styles.label}>Description (Optional)</Text>
           <TextInput
             style={[styles.input, styles.descriptionInput]}
             value={description}
             onChangeText={setDescription}
-            placeholder={t('sendMxi.descriptionPlaceholder')}
+            placeholder="Add a note for this transfer"
             placeholderTextColor={colors.textSecondary}
             multiline
             numberOfLines={3}
           />
         </View>
 
-        {/* Transaction Summary */}
         {mxiAmount > 0 && (
           <View style={styles.summaryCard}>
-            <Text style={styles.summaryTitle}>{t('sendMxi.transactionSummary')}</Text>
+            <Text style={styles.summaryTitle}>Transaction Summary</Text>
             
             <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>{t('sendMxi.sendingAmount')}</Text>
+              <Text style={styles.summaryLabel}>Sending Amount</Text>
               <Text style={styles.summaryValue}>{mxiAmount.toFixed(6)} MXI</Text>
             </View>
 
             {isConnected && mxiRate && (
               <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>{t('sendMxi.usdValue')}</Text>
+                <Text style={styles.summaryLabel}>USD Value</Text>
                 <Text style={styles.summaryValue}>${usdValue.toFixed(2)}</Text>
               </View>
             )}
 
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>
-                {t('sendMxi.commission')} ({commissionRate}%)
+                Commission ({commissionRate}%)
               </Text>
               <Text style={[styles.summaryValue, { color: colors.danger }]}>
                 -{commissionAmount.toFixed(6)} MXI
@@ -254,7 +232,7 @@ export default function SendMXIScreen() {
             <View style={styles.divider} />
 
             <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabelBold}>{t('sendMxi.recipientReceives')}</Text>
+              <Text style={styles.summaryLabelBold}>Recipient Receives</Text>
               <Text style={styles.summaryValueBold}>
                 {recipientReceives.toFixed(6)} MXI
               </Text>
@@ -262,7 +240,7 @@ export default function SendMXIScreen() {
 
             {isConnected && mxiRate && (
               <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>{t('sendMxi.recipientUsdValue')}</Text>
+                <Text style={styles.summaryLabel}>Recipient USD Value</Text>
                 <Text style={styles.summaryValue}>
                   ≈ ${convertMXIToUSD(recipientReceives).toFixed(2)} USD
                 </Text>
@@ -271,16 +249,17 @@ export default function SendMXIScreen() {
           </View>
         )}
 
-        {/* Info Card */}
         <View style={styles.infoCard}>
           <IconSymbol name="info.circle.fill" size={24} color={colors.primary} />
           <View style={styles.infoContent}>
-            <Text style={styles.infoTitle}>{t('sendMxi.aboutCommissions')}</Text>
-            <Text style={styles.infoText}>{t('sendMxi.commissionInfo', { rate: commissionRate })}</Text>
+            <Text style={styles.infoTitle}>About Commissions</Text>
+            <Text style={styles.infoText}>
+              A {commissionRate}% commission is deducted from transfers and distributed to your referral chain. 
+              The recipient can withdraw the received MXI immediately.
+            </Text>
           </View>
         </View>
 
-        {/* Action Buttons */}
         <View style={styles.buttonGroup}>
           <Pressable
             style={[
@@ -293,7 +272,7 @@ export default function SendMXIScreen() {
           >
             <IconSymbol name="paperplane.fill" size={20} color="#ffffff" />
             <Text style={styles.buttonText}>
-              {isProcessing ? t('sendMxi.processing') : t('sendMxi.sendMxi')}
+              {isProcessing ? 'Processing...' : 'Send MXI'}
             </Text>
           </Pressable>
 
@@ -303,7 +282,7 @@ export default function SendMXIScreen() {
             disabled={isProcessing}
           >
             <Text style={[styles.buttonText, { color: colors.text }]}>
-              {t('common.cancel')}
+              Cancel
             </Text>
           </Pressable>
         </View>
