@@ -17,63 +17,66 @@ import { colors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 
 export default function MiningPanelScreen() {
-  const { user, getReferralLink, getActiveReferralsCount } = useAuth();
+  const { user, getReferralLink, getActiveReferralsCount, isUnlocked } = useAuth();
   const { getMiningAccess, checkAccessExpiry, getMiningAccessCost } = useMiningAccess();
   const { mxiPrice } = useBinance();
   const [miningAccess, setMiningAccess] = useState<any>(null);
-  const [hasActiveAccess, setHasActiveAccess] = useState(false);
-  const [loading, setLoading] = useState(true);
   const [activeReferrals, setActiveReferrals] = useState(0);
-
-  const loadMiningAccess = useCallback(async () => {
-    if (!user) return;
-
-    try {
-      setLoading(true);
-      const access = await getMiningAccess(user.id);
-      const isActive = await checkAccessExpiry(user.id);
-      const activeCount = await getActiveReferralsCount();
-      
-      setMiningAccess(access);
-      setHasActiveAccess(isActive);
-      setActiveReferrals(activeCount);
-    } catch (error) {
-      console.error('Error loading mining access:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, [user, getMiningAccess, checkAccessExpiry, getActiveReferralsCount]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadMiningAccess();
-  }, []);
+    loadMiningData();
+  }, [user]);
 
-  const handlePurchaseAccess = () => {
-    if (!user?.unlockPaymentMade) {
+  const loadMiningData = async () => {
+    if (!user) return;
+
+    setLoading(true);
+    const access = await getMiningAccess(user.id);
+    const hasValidAccess = await checkAccessExpiry(user.id);
+    const referralsCount = await getActiveReferralsCount();
+
+    setMiningAccess(access);
+    setActiveReferrals(referralsCount);
+    setLoading(false);
+  };
+
+  const handlePurchaseAccess = useCallback(() => {
+    if (!user) return;
+
+    // Check if features are unlocked (with bypass)
+    if (!isUnlocked()) {
       Alert.alert(
-        'Unlock Payment Required',
-        'You must make the 100 USDT unlock payment before accessing mining features. This is separate from mining power purchases.',
+        'Unlock Required',
+        'You need to make the 100 USDT unlock payment before purchasing mining access.',
         [
           { text: 'Cancel', style: 'cancel' },
-          { text: 'Make Unlock Payment', onPress: () => router.push('/unlock-payment') },
+          { text: 'Unlock Now', onPress: () => router.push('/unlock-payment') },
         ]
       );
       return;
     }
-    router.push('/mining-access-purchase');
-  };
 
-  const handleRenewAccess = () => {
-    router.push('/mining-access-purchase?renewal=true');
-  };
+    router.push({
+      pathname: '/mining-access-purchase',
+      params: { isRenewal: 'false' },
+    });
+  }, [user, isUnlocked]);
+
+  const handleRenewAccess = useCallback(() => {
+    if (!user) return;
+
+    router.push({
+      pathname: '/mining-access-purchase',
+      params: { isRenewal: 'true' },
+    });
+  }, [user]);
 
   const handleShareReferralLink = async () => {
-    if (!user) return;
-    
     try {
-      const referralLink = getReferralLink();
+      const link = getReferralLink();
       await Share.share({
-        message: `Join Maxcoin MXI and start mining cryptocurrency! Use my referral link: ${referralLink}`,
+        message: `Join me on Maxcoin MXI and start mining cryptocurrency! Use my referral link: ${link}`,
       });
     } catch (error) {
       console.error('Error sharing referral link:', error);
@@ -89,38 +92,23 @@ export default function MiningPanelScreen() {
   };
 
   const getReferralMetrics = () => {
-    if (!user) return { total: 0, active: 0 };
-    
     return {
-      total: user.referrals.length,
+      total: user?.referrals.length || 0,
       active: activeReferrals,
+      earnings: user?.referralEarnings || 0,
     };
   };
 
   const canWithdrawMiningEarnings = () => {
-    // Mining earnings require 10 active referrals with purchases per cycle
-    return activeReferrals >= 10;
+    const requiredReferrals = 10;
+    const withdrawalsMade = user?.withdrawalRestrictions.withdrawalCount || 0;
+    
+    if (withdrawalsMade >= 5) return true;
+    return activeReferrals >= requiredReferrals;
   };
 
-  if (loading) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <Pressable onPress={() => router.back()} style={styles.backButton}>
-            <IconSymbol name="chevron.left" size={24} color={colors.text} />
-          </Pressable>
-          <Text style={styles.headerTitle}>Mining Panel</Text>
-          <View style={{ width: 40 }} />
-        </View>
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading...</Text>
-        </View>
-      </View>
-    );
-  }
-
-  // Check if user has made unlock payment
-  if (!user?.unlockPaymentMade) {
+  // Show unlock required message if not unlocked (and bypass is not active)
+  if (!isUnlocked()) {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
@@ -133,37 +121,18 @@ export default function MiningPanelScreen() {
 
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
           <View style={styles.lockedCard}>
-            <IconSymbol name="lock.fill" size={64} color={colors.warning} />
-            <Text style={styles.lockedTitle}>Mining Access Locked</Text>
+            <IconSymbol name="lock.fill" size={80} color={colors.textSecondary} />
+            <Text style={styles.lockedTitle}>Mining Locked</Text>
             <Text style={styles.lockedDescription}>
-              To unlock mining features, you must make the mandatory 100 USDT unlock payment. This is separate from mining power purchases.
+              Make the 100 USDT unlock payment to access mining features and start earning MXI!
             </Text>
             
-            <View style={styles.requirementBox}>
-              <Text style={styles.requirementTitle}>Requirements:</Text>
-              <Text style={styles.requirementText}>
-                - One-time unlock payment: 100 USDT
-              </Text>
-              <Text style={styles.requirementText}>
-                - This unlocks both Mining and Lottery features
-              </Text>
-              <Text style={styles.requirementText}>
-                - Separate from mining power purchases
-              </Text>
-              <Text style={styles.requirementText}>
-                - After unlocking, you can purchase the mining package
-              </Text>
-              <Text style={styles.requirementText}>
-                - Mining package costs 100 USDT for 30 days
-              </Text>
-            </View>
-
             <Pressable 
               style={styles.unlockButton} 
               onPress={() => router.push('/unlock-payment')}
             >
               <IconSymbol name="lock.open.fill" size={20} color={colors.background} />
-              <Text style={styles.unlockButtonText}>Make Unlock Payment (100 USDT)</Text>
+              <Text style={styles.unlockButtonText}>Unlock Now</Text>
             </Pressable>
           </View>
         </ScrollView>
@@ -171,10 +140,8 @@ export default function MiningPanelScreen() {
     );
   }
 
-  const referralMetrics = getReferralMetrics();
-  const daysRemaining = getDaysRemaining();
+  const hasAccess = miningAccess?.hasAccess && getDaysRemaining() > 0;
   const accessCost = getMiningAccessCost();
-  const miningWithdrawalsEnabled = canWithdrawMiningEarnings();
 
   return (
     <View style={styles.container}>
@@ -187,240 +154,183 @@ export default function MiningPanelScreen() {
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Access Status Card */}
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <IconSymbol name="lock.shield.fill" size={32} color={hasActiveAccess ? colors.success : colors.error} />
-            <Text style={styles.cardTitle}>Mining Access Status</Text>
+        {/* Mining Status Card */}
+        <View style={[styles.statusCard, hasAccess ? styles.statusCardActive : styles.statusCardInactive]}>
+          <View style={styles.statusIconContainer}>
+            <IconSymbol 
+              name={hasAccess ? "checkmark.circle.fill" : "xmark.circle.fill"} 
+              size={60} 
+              color={hasAccess ? colors.success : colors.error} 
+            />
           </View>
           
-          {hasActiveAccess ? (
+          <Text style={styles.statusTitle}>
+            {hasAccess ? 'Mining Active' : 'Mining Inactive'}
+          </Text>
+          
+          {hasAccess ? (
             <>
-              <View style={styles.statusRow}>
-                <Text style={styles.statusLabel}>Status:</Text>
-                <Text style={[styles.statusValue, { color: colors.success }]}>Active</Text>
+              <Text style={styles.statusSubtitle}>
+                {getDaysRemaining()} days remaining
+              </Text>
+              <View style={styles.statusMetrics}>
+                <View style={styles.metricItem}>
+                  <Text style={styles.metricLabel}>Total Mined</Text>
+                  <Text style={styles.metricValue}>
+                    {miningAccess?.totalMined?.toFixed(6) || '0.000000'} MXI
+                  </Text>
+                </View>
+                <View style={styles.metricDivider} />
+                <View style={styles.metricItem}>
+                  <Text style={styles.metricLabel}>Mining Power</Text>
+                  <Text style={styles.metricValue}>{user?.miningPower.toFixed(2)}x</Text>
+                </View>
               </View>
-              <View style={styles.statusRow}>
-                <Text style={styles.statusLabel}>Days Remaining:</Text>
-                <Text style={styles.statusValue}>{daysRemaining} days</Text>
-              </View>
-              <View style={styles.statusRow}>
-                <Text style={styles.statusLabel}>Rental Period:</Text>
-                <Text style={styles.statusValue}>30 days</Text>
-              </View>
-              <View style={styles.statusRow}>
-                <Text style={styles.statusLabel}>Renewals:</Text>
-                <Text style={styles.statusValue}>{miningAccess?.renewalCount || 0}</Text>
-              </View>
-              
-              {daysRemaining <= 7 && (
-                <Pressable style={styles.renewButton} onPress={handleRenewAccess}>
-                  <IconSymbol name="arrow.clockwise" size={20} color={colors.background} />
-                  <Text style={styles.renewButtonText}>Renew Access (30 days - 100 USDT)</Text>
-                </Pressable>
-              )}
             </>
           ) : (
-            <>
-              <Text style={styles.noAccessText}>
-                Purchase the initial mining package (100 USDT) to start earning MXI through mining. Mining access is rented for 30 days and can be renewed.
-              </Text>
-              <View style={styles.costInfo}>
-                <Text style={styles.costLabel}>Access Cost:</Text>
-                <Text style={styles.costValue}>{accessCost} USDT</Text>
-              </View>
-              <View style={styles.costInfo}>
-                <Text style={styles.costLabel}>Duration:</Text>
-                <Text style={styles.costValue}>30 Days</Text>
-              </View>
-              
-              <Pressable style={styles.purchaseButton} onPress={handlePurchaseAccess}>
-                <IconSymbol name="cart.fill" size={20} color={colors.background} />
-                <Text style={styles.purchaseButtonText}>Purchase Initial Package (100 USDT)</Text>
-              </Pressable>
-            </>
+            <Text style={styles.statusSubtitle}>
+              Purchase mining access to start earning
+            </Text>
           )}
         </View>
 
-        {/* Buy Mining Power Card */}
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <IconSymbol name="cart.fill" size={32} color={colors.accent} />
-            <Text style={styles.cardTitle}>Boost Mining Power</Text>
-          </View>
-          
-          <Text style={styles.cardDescription}>
-            Increase your mining power by purchasing with USDT. Each purchase boosts your mining rate for 30 days.
-          </Text>
-
-          <View style={styles.infoBox}>
-            <IconSymbol name="info.circle.fill" size={20} color={colors.primary} />
-            <Text style={styles.infoBoxText}>
-              Mining power increases by 1% for every 10 USDT spent. All purchases are valid for 30 days from purchase date.
+        {/* Action Buttons */}
+        {!hasAccess ? (
+          <Pressable style={styles.primaryButton} onPress={handlePurchaseAccess}>
+            <IconSymbol name="bolt.fill" size={24} color={colors.background} />
+            <Text style={styles.primaryButtonText}>
+              Purchase Mining Access ({accessCost} USDT)
             </Text>
-          </View>
-
-          <Pressable 
-            style={styles.buyButton} 
-            onPress={() => router.push('/purchase')}
-          >
-            <IconSymbol name="plus.circle.fill" size={20} color={colors.background} />
-            <Text style={styles.buyButtonText}>Purchase Mining Power (USDT)</Text>
           </Pressable>
-        </View>
-
-        {/* Mining Metrics Card */}
-        {hasActiveAccess && (
-          <View style={styles.card}>
-            <View style={styles.cardHeader}>
-              <IconSymbol name="chart.bar.fill" size={32} color={colors.primary} />
-              <Text style={styles.cardTitle}>Mining Metrics</Text>
-            </View>
-            
-            <View style={styles.metricRow}>
-              <View style={styles.metricItem}>
-                <Text style={styles.metricLabel}>Total Mined</Text>
-                <Text style={styles.metricValue}>
-                  {(miningAccess?.totalMined || 0).toFixed(6)} MXI
-                </Text>
-                <Text style={styles.metricUsd}>
-                  ≈ ${((miningAccess?.totalMined || 0) * mxiPrice).toFixed(2)}
-                </Text>
-              </View>
-              
-              <View style={styles.metricItem}>
-                <Text style={styles.metricLabel}>Total Withdrawn</Text>
-                <Text style={styles.metricValue}>
-                  {(miningAccess?.totalWithdrawn || 0).toFixed(6)} MXI
-                </Text>
-                <Text style={styles.metricUsd}>
-                  ≈ ${((miningAccess?.totalWithdrawn || 0) * mxiPrice).toFixed(2)}
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.metricRow}>
-              <View style={styles.metricItem}>
-                <Text style={styles.metricLabel}>Current Balance</Text>
-                <Text style={styles.metricValue}>
-                  {(user?.balance || 0).toFixed(6)} MXI
-                </Text>
-                <Text style={styles.metricUsd}>
-                  ≈ ${((user?.balance || 0) * mxiPrice).toFixed(2)}
-                </Text>
-              </View>
-              
-              <View style={styles.metricItem}>
-                <Text style={styles.metricLabel}>Mining Power</Text>
-                <Text style={styles.metricValue}>
-                  {user?.miningPower.toFixed(4)}x
-                </Text>
-              </View>
-            </View>
-          </View>
+        ) : (
+          <Pressable style={styles.secondaryButton} onPress={handleRenewAccess}>
+            <IconSymbol name="arrow.clockwise" size={24} color={colors.primary} />
+            <Text style={styles.secondaryButtonText}>
+              Renew Access ({accessCost} USDT)
+            </Text>
+          </Pressable>
         )}
 
-        {/* Referral Progress Card */}
+        {/* Mining Info Card */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-            <IconSymbol name="person.3.fill" size={32} color={colors.accent} />
-            <Text style={styles.cardTitle}>Referral Progress</Text>
+            <IconSymbol name="info.circle.fill" size={24} color={colors.primary} />
+            <Text style={styles.cardTitle}>Mining Information</Text>
           </View>
           
-          <View style={styles.referralRow}>
-            <Text style={styles.referralLabel}>Total Referrals:</Text>
-            <Text style={styles.referralValue}>{referralMetrics.total}</Text>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Access Cost:</Text>
+            <Text style={styles.infoValue}>{accessCost} USDT</Text>
           </View>
-          
-          <View style={styles.referralRow}>
-            <Text style={styles.referralLabel}>Active Referrals (with purchases):</Text>
-            <Text style={styles.referralValue}>{referralMetrics.active}</Text>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Duration:</Text>
+            <Text style={styles.infoValue}>30 days</Text>
           </View>
-          
-          <View style={styles.referralRow}>
-            <Text style={styles.referralLabel}>Referral Earnings:</Text>
-            <Text style={styles.referralValue}>
-              {(user?.referralEarnings || 0).toFixed(6)} MXI
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Base Rate:</Text>
+            <Text style={styles.infoValue}>0.1 MXI / 2 hours</Text>
+          </View>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Your Power:</Text>
+            <Text style={styles.infoValue}>{user?.miningPower.toFixed(2)}x</Text>
+          </View>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Your Rate:</Text>
+            <Text style={styles.infoValue}>
+              {((0.1 * (user?.miningPower || 1)) / 2).toFixed(6)} MXI / hour
             </Text>
           </View>
+        </View>
 
-          <View style={styles.progressBarContainer}>
-            <View style={styles.progressBarLabel}>
-              <Text style={styles.progressBarText}>
-                Progress to unlock mining withdrawals
-              </Text>
-              <Text style={styles.progressBarValue}>
-                {referralMetrics.active}/10
-              </Text>
+        {/* Referral Card */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <IconSymbol name="person.3.fill" size={24} color={colors.primary} />
+            <Text style={styles.cardTitle}>Referral Program</Text>
+          </View>
+          
+          <View style={styles.referralMetrics}>
+            <View style={styles.referralMetricItem}>
+              <Text style={styles.referralMetricValue}>{getReferralMetrics().total}</Text>
+              <Text style={styles.referralMetricLabel}>Total Referrals</Text>
             </View>
-            <View style={styles.progressBar}>
-              <View 
-                style={[
-                  styles.progressBarFill, 
-                  { width: `${Math.min((referralMetrics.active / 10) * 100, 100)}%` }
-                ]} 
-              />
+            <View style={styles.referralMetricItem}>
+              <Text style={styles.referralMetricValue}>{getReferralMetrics().active}</Text>
+              <Text style={styles.referralMetricLabel}>Active Referrals</Text>
+            </View>
+            <View style={styles.referralMetricItem}>
+              <Text style={styles.referralMetricValue}>
+                {getReferralMetrics().earnings.toFixed(2)}
+              </Text>
+              <Text style={styles.referralMetricLabel}>MXI Earned</Text>
             </View>
           </View>
 
           <Pressable style={styles.shareButton} onPress={handleShareReferralLink}>
-            <IconSymbol name="square.and.arrow.up" size={20} color={colors.background} />
+            <IconSymbol name="square.and.arrow.up" size={20} color={colors.primary} />
             <Text style={styles.shareButtonText}>Share Referral Link</Text>
           </Pressable>
+
+          <View style={styles.commissionInfo}>
+            <Text style={styles.commissionTitle}>Commission Structure:</Text>
+            <Text style={styles.commissionText}>• Level 1: 5% of purchases</Text>
+            <Text style={styles.commissionText}>• Level 2: 2% of purchases</Text>
+            <Text style={styles.commissionText}>• Level 3: 1% of purchases</Text>
+          </View>
         </View>
 
-        {/* Withdrawal Availability Card */}
+        {/* Withdrawal Requirements Card */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-            <IconSymbol name="arrow.up.circle.fill" size={32} color={miningWithdrawalsEnabled ? colors.success : colors.warning} />
-            <Text style={styles.cardTitle}>Withdrawal Status</Text>
+            <IconSymbol name="exclamationmark.triangle.fill" size={24} color={colors.warning} />
+            <Text style={styles.cardTitle}>Withdrawal Requirements</Text>
           </View>
           
-          <View style={styles.withdrawalInfo}>
-            <Text style={styles.withdrawalLabel}>Purchased/Transferred MXI:</Text>
-            <Text style={[styles.withdrawalStatus, { color: colors.success }]}>
-              Always Available
+          <Text style={styles.requirementText}>
+            To withdraw mining earnings for your first 5 withdrawals, you need:
+          </Text>
+          
+          <View style={styles.requirementItem}>
+            <IconSymbol 
+              name={canWithdrawMiningEarnings() ? "checkmark.circle.fill" : "xmark.circle.fill"} 
+              size={24} 
+              color={canWithdrawMiningEarnings() ? colors.success : colors.error} 
+            />
+            <Text style={styles.requirementItemText}>
+              10 active referrals with purchases
             </Text>
           </View>
           
-          <View style={styles.withdrawalInfo}>
-            <Text style={styles.withdrawalLabel}>Commission Earnings:</Text>
-            <Text style={[styles.withdrawalStatus, { color: colors.success }]}>
-              Available Immediately
-            </Text>
-          </View>
+          <Text style={styles.requirementNote}>
+            Current: {activeReferrals} / 10 active referrals
+          </Text>
+          
+          <Text style={styles.requirementNote}>
+            After 5 withdrawals, this requirement is removed.
+          </Text>
+        </View>
 
-          <View style={styles.withdrawalInfo}>
-            <Text style={styles.withdrawalLabel}>Mining Earnings:</Text>
-            <Text style={[styles.withdrawalStatus, { color: miningWithdrawalsEnabled ? colors.success : colors.warning }]}>
-              {miningWithdrawalsEnabled ? 'Available' : 'Restricted'}
-            </Text>
+        {/* Boost Mining Power */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <IconSymbol name="bolt.fill" size={24} color="#FFD700" />
+            <Text style={styles.cardTitle}>Boost Mining Power</Text>
           </View>
           
-          {!miningWithdrawalsEnabled && (
-            <View style={styles.requirementsBox}>
-              <Text style={styles.requirementsTitle}>Requirements to withdraw mining earnings:</Text>
-              <Text style={styles.requirementText}>
-                - 10 active referrals with purchases per cycle
-              </Text>
-              <Text style={styles.requirementText}>
-                - Purchases include initial package (100 USDT) or mining power
-              </Text>
-              <Text style={styles.requirementText}>
-                - Current progress: {referralMetrics.active}/10 active referrals
-              </Text>
-              <Text style={styles.requirementText}>
-                - This applies to the first 5 withdrawals
-              </Text>
-            </View>
-          )}
+          <Text style={styles.boostDescription}>
+            Increase your mining rate by purchasing mining power with USDT.
+          </Text>
+          
+          <Text style={styles.boostFormula}>
+            +1% power per 10 USDT invested
+          </Text>
           
           <Pressable 
-            style={styles.withdrawButton} 
-            onPress={() => router.push('/formsheet')}
+            style={styles.boostButton} 
+            onPress={() => router.push('/purchase')}
           >
-            <IconSymbol name="arrow.up.circle" size={20} color={colors.background} />
-            <Text style={styles.withdrawButtonText}>Withdraw MXI</Text>
+            <IconSymbol name="arrow.up.circle.fill" size={20} color={colors.background} />
+            <Text style={styles.boostButtonText}>Boost Power</Text>
           </Pressable>
         </View>
 
@@ -461,14 +371,237 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 20,
   },
-  loadingContainer: {
+  statusCard: {
+    borderRadius: 20,
+    padding: 24,
+    marginBottom: 16,
+    alignItems: 'center',
+    borderWidth: 2,
+  },
+  statusCardActive: {
+    backgroundColor: colors.cardBackground,
+    borderColor: colors.success,
+  },
+  statusCardInactive: {
+    backgroundColor: colors.cardBackground,
+    borderColor: colors.error,
+  },
+  statusIconContainer: {
+    marginBottom: 16,
+  },
+  statusTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: colors.text,
+    marginBottom: 8,
+  },
+  statusSubtitle: {
+    fontSize: 16,
+    color: colors.textSecondary,
+    marginBottom: 16,
+  },
+  statusMetrics: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.background,
+    borderRadius: 12,
+    padding: 16,
+    width: '100%',
+  },
+  metricItem: {
     flex: 1,
+    alignItems: 'center',
+  },
+  metricDivider: {
+    width: 1,
+    height: 40,
+    backgroundColor: colors.border,
+  },
+  metricLabel: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginBottom: 4,
+  },
+  metricValue: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  primaryButton: {
+    backgroundColor: colors.primary,
+    borderRadius: 16,
+    padding: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  primaryButtonText: {
+    color: colors.background,
+    fontSize: 16,
+    fontWeight: '700',
+    marginLeft: 8,
+  },
+  secondaryButton: {
+    backgroundColor: colors.background,
+    borderRadius: 16,
+    padding: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+    borderWidth: 2,
+    borderColor: colors.primary,
+  },
+  secondaryButtonText: {
+    color: colors.primary,
+    fontSize: 16,
+    fontWeight: '700',
+    marginLeft: 8,
+  },
+  card: {
+    backgroundColor: colors.cardBackground,
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.text,
+    marginLeft: 12,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  infoLabel: {
+    fontSize: 14,
+    color: colors.textSecondary,
+  },
+  infoValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  referralMetrics: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 16,
+    backgroundColor: colors.background,
+    borderRadius: 12,
+    padding: 16,
+  },
+  referralMetricItem: {
+    alignItems: 'center',
+  },
+  referralMetricValue: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: colors.primary,
+    marginBottom: 4,
+  },
+  referralMetricLabel: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    textAlign: 'center',
+  },
+  shareButton: {
+    backgroundColor: colors.background,
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+  shareButtonText: {
+    color: colors.primary,
+    fontSize: 14,
+    fontWeight: '700',
+    marginLeft: 8,
+  },
+  commissionInfo: {
+    backgroundColor: colors.background,
+    borderRadius: 12,
+    padding: 16,
+  },
+  commissionTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: 8,
+  },
+  commissionText: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    marginBottom: 4,
+  },
+  requirementText: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginBottom: 16,
+    lineHeight: 20,
+  },
+  requirementItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    backgroundColor: colors.background,
+    borderRadius: 12,
+    padding: 12,
+  },
+  requirementItemText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text,
+    marginLeft: 12,
+  },
+  requirementNote: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    marginTop: 8,
+    lineHeight: 18,
+  },
+  boostDescription: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginBottom: 12,
+    lineHeight: 20,
+  },
+  boostFormula: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.primary,
+    textAlign: 'center',
+    marginBottom: 16,
+    backgroundColor: colors.background,
+    borderRadius: 12,
+    padding: 12,
+  },
+  boostButton: {
+    backgroundColor: colors.primary,
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  loadingText: {
-    fontSize: 16,
-    color: colors.textSecondary,
+  boostButtonText: {
+    color: colors.background,
+    fontSize: 14,
+    fontWeight: '700',
+    marginLeft: 8,
   },
   lockedCard: {
     backgroundColor: colors.cardBackground,
@@ -476,7 +609,7 @@ const styles = StyleSheet.create({
     padding: 32,
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: colors.warning,
+    borderColor: colors.border,
   },
   lockedTitle: {
     fontSize: 24,
@@ -493,25 +626,6 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     marginBottom: 24,
   },
-  requirementBox: {
-    backgroundColor: colors.background,
-    borderRadius: 12,
-    padding: 20,
-    width: '100%',
-    marginBottom: 24,
-  },
-  requirementTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.text,
-    marginBottom: 12,
-  },
-  requirementText: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    lineHeight: 22,
-    marginBottom: 4,
-  },
   unlockButton: {
     backgroundColor: colors.primary,
     borderRadius: 12,
@@ -522,252 +636,6 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   unlockButtonText: {
-    color: colors.background,
-    fontSize: 16,
-    fontWeight: '700',
-    marginLeft: 8,
-  },
-  card: {
-    backgroundColor: colors.cardBackground,
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.text,
-    marginLeft: 12,
-  },
-  cardDescription: {
-    fontSize: 15,
-    color: colors.textSecondary,
-    lineHeight: 22,
-    marginBottom: 16,
-  },
-  statusRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  statusLabel: {
-    fontSize: 16,
-    color: colors.textSecondary,
-  },
-  statusValue: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text,
-  },
-  noAccessText: {
-    fontSize: 15,
-    color: colors.textSecondary,
-    lineHeight: 22,
-    marginBottom: 20,
-  },
-  costInfo: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  costLabel: {
-    fontSize: 16,
-    color: colors.textSecondary,
-  },
-  costValue: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.primary,
-  },
-  purchaseButton: {
-    backgroundColor: colors.primary,
-    borderRadius: 12,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 12,
-  },
-  purchaseButtonText: {
-    color: colors.background,
-    fontSize: 16,
-    fontWeight: '700',
-    marginLeft: 8,
-  },
-  renewButton: {
-    backgroundColor: colors.accent,
-    borderRadius: 12,
-    padding: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 12,
-  },
-  renewButtonText: {
-    color: colors.background,
-    fontSize: 15,
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-  infoBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.highlight,
-    borderRadius: 8,
-    padding: 12,
-    gap: 10,
-    marginBottom: 16,
-  },
-  infoBoxText: {
-    flex: 1,
-    fontSize: 13,
-    color: colors.text,
-    lineHeight: 18,
-  },
-  buyButton: {
-    backgroundColor: colors.accent,
-    borderRadius: 12,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  buyButtonText: {
-    color: colors.background,
-    fontSize: 16,
-    fontWeight: '700',
-    marginLeft: 8,
-  },
-  metricRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  metricItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  metricLabel: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    marginBottom: 8,
-  },
-  metricValue: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.text,
-    marginBottom: 4,
-  },
-  metricUsd: {
-    fontSize: 12,
-    color: colors.textSecondary,
-  },
-  referralRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  referralLabel: {
-    fontSize: 15,
-    color: colors.textSecondary,
-  },
-  referralValue: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text,
-  },
-  progressBarContainer: {
-    marginTop: 16,
-    marginBottom: 16,
-  },
-  progressBarLabel: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  progressBarText: {
-    fontSize: 14,
-    color: colors.textSecondary,
-  },
-  progressBarValue: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.primary,
-  },
-  progressBar: {
-    height: 10,
-    backgroundColor: colors.background,
-    borderRadius: 5,
-    overflow: 'hidden',
-  },
-  progressBarFill: {
-    height: '100%',
-    backgroundColor: colors.primary,
-    borderRadius: 5,
-  },
-  shareButton: {
-    backgroundColor: colors.accent,
-    borderRadius: 12,
-    padding: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 8,
-  },
-  shareButtonText: {
-    color: colors.background,
-    fontSize: 15,
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-  withdrawalInfo: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  withdrawalLabel: {
-    fontSize: 15,
-    color: colors.textSecondary,
-    flex: 1,
-  },
-  withdrawalStatus: {
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  requirementsBox: {
-    backgroundColor: colors.background,
-    borderRadius: 12,
-    padding: 16,
-    marginVertical: 12,
-  },
-  requirementsTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.text,
-    marginBottom: 8,
-  },
-  withdrawButton: {
-    backgroundColor: colors.success,
-    borderRadius: 12,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 12,
-  },
-  withdrawButtonText: {
     color: colors.background,
     fontSize: 16,
     fontWeight: '700',

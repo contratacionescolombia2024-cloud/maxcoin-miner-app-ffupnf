@@ -4,6 +4,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useMiningConfig } from './MiningConfigContext';
 import { supabase } from '@/app/integrations/supabase/client';
 
+// TEMPORARY TESTING FLAG - Set to true to bypass unlock payment requirement
+const TEMPORARY_UNLOCK_BYPASS = true;
+
 export interface Transaction {
   id: string;
   type: 'transfer' | 'purchase' | 'mining' | 'commission' | 'withdrawal';
@@ -77,6 +80,7 @@ interface AuthContextType {
   getActiveReferralsCount: () => Promise<number>;
   recordFirstPurchase: (usdAmount: number) => Promise<void>;
   recordUnlockPayment: () => Promise<void>;
+  isUnlocked: () => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -319,6 +323,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (error) {
       console.error('Error recording unlock payment:', error);
     }
+  };
+
+  // Check if user has unlocked features (with temporary bypass)
+  const isUnlocked = (): boolean => {
+    if (TEMPORARY_UNLOCK_BYPASS) {
+      console.log('⚠️ TEMPORARY UNLOCK BYPASS ACTIVE - All features unlocked for testing');
+      return true;
+    }
+    return user?.unlockPaymentMade || false;
   };
 
   const register = async (
@@ -891,6 +904,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         getActiveReferralsCount,
         recordFirstPurchase,
         recordUnlockPayment,
+        isUnlocked,
       }}
     >
       {children}
