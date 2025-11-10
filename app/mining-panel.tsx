@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -25,11 +25,7 @@ export default function MiningPanelScreen() {
   const [loading, setLoading] = useState(true);
   const [activeReferrals, setActiveReferrals] = useState(0);
 
-  useEffect(() => {
-    loadMiningAccess();
-  }, [user]);
-
-  const loadMiningAccess = async () => {
+  const loadMiningAccess = useCallback(async () => {
     if (!user) return;
 
     try {
@@ -46,7 +42,11 @@ export default function MiningPanelScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user, getMiningAccess, checkAccessExpiry, getActiveReferralsCount]);
+
+  useEffect(() => {
+    loadMiningAccess();
+  }, [loadMiningAccess]);
 
   const handlePurchaseAccess = () => {
     if (!user?.hasFirstPurchase) {

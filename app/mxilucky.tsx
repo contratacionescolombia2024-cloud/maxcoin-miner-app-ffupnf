@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -34,11 +34,7 @@ export default function MXILuckyScreen() {
   const [totalTickets, setTotalTickets] = useState(0);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    loadLotteryData();
-  }, [user]);
-
-  const loadLotteryData = async () => {
+  const loadLotteryData = useCallback(async () => {
     if (!user) return;
 
     try {
@@ -52,7 +48,11 @@ export default function MXILuckyScreen() {
     } catch (error) {
       console.error('Error loading lottery data:', error);
     }
-  };
+  }, [user, getUserTickets, getCurrentPrizePool, getTotalTicketsSold]);
+
+  useEffect(() => {
+    loadLotteryData();
+  }, [loadLotteryData]);
 
   const handlePurchaseTickets = async () => {
     if (!user) {

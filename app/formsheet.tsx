@@ -161,19 +161,19 @@ export default function FormSheetModal() {
           </Text>
           <View style={styles.breakdownContainer}>
             <View style={styles.breakdownRow}>
-              <View style={styles.breakdownDot} style={{ backgroundColor: colors.success }} />
+              <View style={[styles.breakdownDot, { backgroundColor: colors.success }]} />
               <Text style={styles.withdrawableNote}>
                 Purchased: {user.withdrawalRestrictions?.purchasedAmount.toFixed(6)} MXI
               </Text>
             </View>
             <View style={styles.breakdownRow}>
-              <View style={styles.breakdownDot} style={{ backgroundColor: colors.primary }} />
+              <View style={[styles.breakdownDot, { backgroundColor: colors.primary }]} />
               <Text style={styles.withdrawableNote}>
                 Commissions: {user.withdrawalRestrictions?.commissionEarnings.toFixed(6)} MXI (immediate)
               </Text>
             </View>
             <View style={styles.breakdownRow}>
-              <View style={styles.breakdownDot} style={{ backgroundColor: user.withdrawalRestrictions?.canWithdrawEarnings ? colors.success : colors.warning }} />
+              <View style={[styles.breakdownDot, { backgroundColor: user.withdrawalRestrictions?.canWithdrawEarnings ? colors.success : colors.warning }]} />
               <Text style={styles.withdrawableNote}>
                 Mining: {user.withdrawalRestrictions?.miningEarnings.toFixed(6)} MXI 
                 {user.withdrawalRestrictions?.canWithdrawEarnings ? ' (available)' : ' (requires 10 referrals)'}
