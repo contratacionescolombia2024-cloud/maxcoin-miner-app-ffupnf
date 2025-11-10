@@ -7,7 +7,7 @@ import {
   ScrollView,
   Pressable,
   Alert,
-} from 'react';
+} from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocalization } from '@/contexts/LocalizationContext';
