@@ -41,7 +41,7 @@ export default function AdminScreen() {
   const [adminPassword, setAdminPassword] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  const ADMIN_PASSWORD = 'admin123'; // In production, this should be securely stored
+  const ADMIN_PASSWORD = 'Ingo1991'; // Admin password
 
   // Check if user is admin
   const isAdmin = user?.email === ADMIN_EMAIL;
@@ -199,7 +199,7 @@ export default function AdminScreen() {
           <View style={styles.infoCard}>
             <IconSymbol name="info.circle.fill" size={20} color={colors.primary} />
             <Text style={styles.infoText}>
-              Default password: admin123 (Change this in production!)
+              Admin password: Ingo1991
             </Text>
           </View>
         </ScrollView>
@@ -249,7 +249,7 @@ export default function AdminScreen() {
                 style={styles.input}
                 value={miningRate}
                 onChangeText={setMiningRate}
-                placeholder="0.0002"
+                placeholder="0.00002"
                 placeholderTextColor={colors.textSecondary}
                 keyboardType="decimal-pad"
               />
