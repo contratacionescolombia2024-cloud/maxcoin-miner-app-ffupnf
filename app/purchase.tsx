@@ -54,10 +54,15 @@ export default function PurchaseScreen() {
       return;
     }
 
-    // Navigate to payment methods screen
+    console.log('Proceeding to payment with amount:', purchaseAmount);
+
+    // Navigate to payment methods screen with both amount and usdValue
     router.push({
       pathname: '/payment-methods',
-      params: { amount: purchaseAmount.toString() },
+      params: { 
+        amount: purchaseAmount.toString(),
+        usdValue: purchaseAmount.toString() // Pass USDT value
+      },
     });
   };
 

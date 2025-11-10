@@ -23,7 +23,11 @@ export default function PaymentMethodsScreen() {
   
   const [processing, setProcessing] = useState(false);
 
+  console.log('PaymentMethodsScreen - Amount:', amount, 'USD Value:', usdValue);
+
   const handleProceedToPayment = async () => {
+    console.log('Confirming payment - Amount:', amount, 'USD Value:', usdValue);
+    
     Alert.alert(
       'Confirm Purchase',
       `You are about to purchase ${amount.toFixed(6)} MXI for $${usdValue.toFixed(2)} USDT via Binance Pay.\n\nProceed with payment?`,
@@ -32,6 +36,7 @@ export default function PaymentMethodsScreen() {
         {
           text: 'Confirm',
           onPress: async () => {
+            console.log('User confirmed payment');
             await processBinancePayment();
           },
         },
@@ -40,17 +45,23 @@ export default function PaymentMethodsScreen() {
   };
 
   const processBinancePayment = async () => {
+    console.log('Processing Binance payment...');
     setProcessing(true);
     
     try {
-      // Simulate Binance payment processing
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Simulate Binance payment processing (temporary for testing)
+      console.log('Simulating payment delay...');
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      console.log('Payment simulation complete, updating balance...');
       
       // Complete the purchase
       await purchaseMaxcoin(amount);
+      console.log('Balance updated with amount:', amount);
       
       // Record first purchase for referral tracking
       await recordFirstPurchase(usdValue);
+      console.log('First purchase recorded with USD value:', usdValue);
       
       let successMessage = `Successfully purchased ${amount.toFixed(6)} MXI!`;
       
@@ -59,13 +70,18 @@ export default function PaymentMethodsScreen() {
         successMessage += '\n\nNote: To access Mining and Lottery features, you need to make the 100 USDT unlock payment separately.';
       }
       
+      console.log('Payment successful, showing success alert');
+      
       Alert.alert(
         'Success',
         successMessage,
         [
           {
             text: 'OK',
-            onPress: () => router.replace('/(tabs)/(home)'),
+            onPress: () => {
+              console.log('Navigating to home screen');
+              router.replace('/(tabs)/(home)');
+            },
           },
         ]
       );
@@ -168,6 +184,9 @@ export default function PaymentMethodsScreen() {
           </Text>
           <Text style={styles.noteText}>
             - All transactions are recorded in your history
+          </Text>
+          <Text style={styles.noteText}>
+            - ⚠️ TESTING MODE: Payment will be simulated automatically
           </Text>
         </View>
 

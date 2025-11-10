@@ -29,6 +29,8 @@ export default function UnlockPaymentScreen() {
       return;
     }
 
+    console.log('Confirming unlock payment - Amount:', mxiAmount, 'USD Value:', UNLOCK_COST_USDT);
+
     Alert.alert(
       'Confirm Unlock Payment',
       `You are about to pay ${UNLOCK_COST_USDT} USDT (${mxiAmount.toFixed(6)} MXI) to unlock Mining and Lottery features.\n\nThis is a one-time payment that unlocks all features permanently.\n\nProceed with payment?`,
@@ -37,6 +39,7 @@ export default function UnlockPaymentScreen() {
         {
           text: 'Confirm',
           onPress: async () => {
+            console.log('User confirmed unlock payment');
             await processUnlockPayment();
           },
         },
@@ -45,17 +48,25 @@ export default function UnlockPaymentScreen() {
   };
 
   const processUnlockPayment = async () => {
+    console.log('Processing unlock payment...');
     setProcessing(true);
     
     try {
-      // Simulate Binance payment processing
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Simulate Binance payment processing (temporary for testing)
+      console.log('Simulating payment delay...');
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      console.log('Payment simulation complete, updating balance...');
       
       // Add MXI to user balance
       await purchaseMaxcoin(mxiAmount);
+      console.log('Balance updated with MXI amount:', mxiAmount);
       
       // Record the unlock payment
       await recordUnlockPayment();
+      console.log('Unlock payment recorded successfully');
+      
+      console.log('Unlock payment successful, showing success alert');
       
       Alert.alert(
         'Success!',
@@ -63,7 +74,10 @@ export default function UnlockPaymentScreen() {
         [
           {
             text: 'Go to Mining Panel',
-            onPress: () => router.replace('/mining-panel'),
+            onPress: () => {
+              console.log('Navigating to mining panel');
+              router.replace('/mining-panel');
+            },
           },
         ]
       );
@@ -272,6 +286,9 @@ export default function UnlockPaymentScreen() {
           </Text>
           <Text style={styles.noteText}>
             - All payments are processed via Binance Pay
+          </Text>
+          <Text style={styles.noteText}>
+            - ⚠️ TESTING MODE: Payment will be simulated automatically
           </Text>
         </View>
 
