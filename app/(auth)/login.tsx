@@ -46,11 +46,68 @@ export default function LoginScreen() {
         router.replace('/(tabs)/(home)');
       } else {
         console.log('Login failed:', result.message);
-        Alert.alert('Login Failed', result.message || 'Invalid email or password');
+        
+        // Show detailed error message with guidance
+        let errorTitle = 'Login Failed';
+        let errorMessage = result.message || 'Invalid email or password';
+        let actionButtons: any[] = [{ text: 'OK', style: 'default' }];
+
+        // Provide specific guidance based on error type
+        if (result.message?.includes('Email not confirmed') || result.message?.includes('verify your email')) {
+          errorTitle = 'Email Not Verified';
+          errorMessage = 'Your email address has not been verified yet.\n\n' +
+                        'Please check your inbox (and spam folder) for the verification email we sent you during registration.\n\n' +
+                        'Click the verification link in that email to activate your account.';
+          actionButtons = [
+            { text: 'OK', style: 'default' },
+            { 
+              text: 'Resend Email', 
+              onPress: () => {
+                Alert.alert(
+                  'Resend Verification',
+                  'Please contact support to resend your verification email.',
+                  [{ text: 'OK' }]
+                );
+              }
+            }
+          ];
+        } else if (result.message?.includes('Invalid login credentials') || result.message?.includes('Invalid email or password')) {
+          errorTitle = 'Invalid Credentials';
+          errorMessage = 'The email or password you entered is incorrect.\n\n' +
+                        'Please check:\n' +
+                        '• Your email address is spelled correctly\n' +
+                        '• Your password is correct (passwords are case-sensitive)\n' +
+                        '• You have registered an account with this email';
+        } else if (result.message?.includes('blocked')) {
+          errorTitle = 'Account Blocked';
+          errorMessage = 'Your account has been blocked.\n\n' +
+                        'Please contact support for assistance: contratacionescolombia2024@gmail.com';
+        } else if (result.message?.includes('profile not found')) {
+          errorTitle = 'Account Not Found';
+          errorMessage = 'Your account profile could not be found.\n\n' +
+                        'This may happen if:\n' +
+                        '• Your account registration was not completed\n' +
+                        '• There was an error during registration\n\n' +
+                        'Please try registering again or contact support.';
+          actionButtons = [
+            { text: 'OK', style: 'default' },
+            { 
+              text: 'Register', 
+              onPress: () => router.replace('/(auth)/register')
+            }
+          ];
+        }
+
+        Alert.alert(errorTitle, errorMessage, actionButtons);
       }
     } catch (error) {
       console.error('Login error:', error);
-      Alert.alert('Error', 'An unexpected error occurred. Please try again.');
+      Alert.alert(
+        'Connection Error', 
+        'An unexpected error occurred while trying to log in.\n\n' +
+        'Please check your internet connection and try again.\n\n' +
+        'If the problem persists, contact support.'
+      );
     } finally {
       setIsLoading(false);
     }
@@ -145,6 +202,16 @@ export default function LoginScreen() {
           <IconSymbol name="info.circle.fill" size={20} color={colors.primary} />
           <Text style={styles.infoText}>
             After registration, you must verify your email before logging in. Check your inbox for the verification link.
+          </Text>
+        </View>
+
+        <View style={styles.troubleshootingBox}>
+          <Text style={styles.troubleshootingTitle}>Having trouble logging in?</Text>
+          <Text style={styles.troubleshootingText}>
+            - Make sure you&apos;ve verified your email address{'\n'}
+            - Check that your email and password are correct{'\n'}
+            - Passwords are case-sensitive{'\n'}
+            - Contact support if you need help
           </Text>
         </View>
 
@@ -263,7 +330,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.highlight,
     borderRadius: 10,
     padding: 14,
-    marginBottom: 20,
+    marginBottom: 16,
     gap: 12,
   },
   infoText: {
@@ -271,6 +338,25 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.text,
     lineHeight: 19,
+  },
+  troubleshootingBox: {
+    backgroundColor: colors.cardBackground,
+    borderRadius: 10,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  troubleshootingTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: 8,
+  },
+  troubleshootingText: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    lineHeight: 20,
   },
   footer: {
     marginTop: 'auto',

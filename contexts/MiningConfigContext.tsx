@@ -4,10 +4,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface MiningConfig {
   miningRatePerMinute: number; // Base mining rate in MXI per minute
-  minPurchase: number; // Minimum MXI purchase amount
-  maxPurchase: number; // Maximum MXI purchase amount per transaction
+  minPurchase: number; // Minimum USDT purchase amount
+  maxPurchase: number; // Maximum USDT purchase amount per transaction
   powerIncreasePercent: number; // Percentage increase per threshold
-  powerIncreaseThreshold: number; // MXI amount needed for power increase
+  powerIncreaseThreshold: number; // USDT amount needed for power increase
   level1Commission: number; // Level 1 referral commission percentage
   level2Commission: number; // Level 2 referral commission percentage
   level3Commission: number; // Level 3 referral commission percentage
@@ -21,10 +21,10 @@ interface MiningConfigContextType {
 
 const DEFAULT_CONFIG: MiningConfig = {
   miningRatePerMinute: 0.00002,
-  minPurchase: 0.02,
-  maxPurchase: 10000,
-  powerIncreasePercent: 1,
-  powerIncreaseThreshold: 10,
+  minPurchase: 1, // Minimum 1 USDT
+  maxPurchase: 10000, // Maximum 10,000 USDT
+  powerIncreasePercent: 1, // 1% increase
+  powerIncreaseThreshold: 10, // per 10 USDT
   level1Commission: 5,
   level2Commission: 2,
   level3Commission: 1,

@@ -52,10 +52,10 @@ export default function MiningPanelScreen() {
     if (!user?.hasFirstPurchase) {
       Alert.alert(
         'First Purchase Required',
-        'You must make your first purchase of at least 100 USDT before accessing mining features. Would you like to purchase MXI now?',
+        'You must make your first purchase of at least 100 USDT before accessing mining features. Would you like to purchase mining power now?',
         [
           { text: 'Cancel', style: 'cancel' },
-          { text: 'Purchase MXI', onPress: () => router.push('/purchase') },
+          { text: 'Purchase Now', onPress: () => router.push('/purchase') },
         ]
       );
       return;
@@ -136,7 +136,7 @@ export default function MiningPanelScreen() {
             <IconSymbol name="lock.fill" size={64} color={colors.warning} />
             <Text style={styles.lockedTitle}>Mining Access Locked</Text>
             <Text style={styles.lockedDescription}>
-              To unlock mining features, you must make your first purchase of at least 100 USDT worth of MXI.
+              To unlock mining features, you must make your first purchase of at least 100 USDT worth of mining power.
             </Text>
             
             <View style={styles.requirementBox}>
@@ -150,6 +150,9 @@ export default function MiningPanelScreen() {
               <Text style={styles.requirementText}>
                 - After unlocking, you can purchase the mining package
               </Text>
+              <Text style={styles.requirementText}>
+                - All purchases are valid for 30 days
+              </Text>
             </View>
 
             <Pressable 
@@ -157,7 +160,7 @@ export default function MiningPanelScreen() {
               onPress={() => router.push('/purchase')}
             >
               <IconSymbol name="cart.fill" size={20} color={colors.background} />
-              <Text style={styles.unlockButtonText}>Purchase MXI Now</Text>
+              <Text style={styles.unlockButtonText}>Purchase Mining Power (USDT)</Text>
             </Pressable>
           </View>
         </ScrollView>
@@ -210,14 +213,14 @@ export default function MiningPanelScreen() {
               {daysRemaining <= 7 && (
                 <Pressable style={styles.renewButton} onPress={handleRenewAccess}>
                   <IconSymbol name="arrow.clockwise" size={20} color={colors.background} />
-                  <Text style={styles.renewButtonText}>Renew Access (30 days)</Text>
+                  <Text style={styles.renewButtonText}>Renew Access (30 days - 100 USDT)</Text>
                 </Pressable>
               )}
             </>
           ) : (
             <>
               <Text style={styles.noAccessText}>
-                Purchase the initial mining package (100 USDT) to start earning MXI through mining. Mining power is rented for 30 days and can be renewed.
+                Purchase the initial mining package (100 USDT) to start earning MXI through mining. Mining access is rented for 30 days and can be renewed.
               </Text>
               <View style={styles.costInfo}>
                 <Text style={styles.costLabel}>Access Cost:</Text>
@@ -230,27 +233,27 @@ export default function MiningPanelScreen() {
               
               <Pressable style={styles.purchaseButton} onPress={handlePurchaseAccess}>
                 <IconSymbol name="cart.fill" size={20} color={colors.background} />
-                <Text style={styles.purchaseButtonText}>Purchase Initial Package</Text>
+                <Text style={styles.purchaseButtonText}>Purchase Initial Package (100 USDT)</Text>
               </Pressable>
             </>
           )}
         </View>
 
-        {/* Buy Maxcoin Card - Moved from home screen */}
+        {/* Buy Mining Power Card */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <IconSymbol name="cart.fill" size={32} color={colors.accent} />
-            <Text style={styles.cardTitle}>Buy Maxcoin (MXI)</Text>
+            <Text style={styles.cardTitle}>Boost Mining Power</Text>
           </View>
           
           <Text style={styles.cardDescription}>
-            Increase your mining power by purchasing MXI. Mining power rental is valid for 30 days from purchase.
+            Increase your mining power by purchasing with USDT. Each purchase boosts your mining rate for 30 days.
           </Text>
 
           <View style={styles.infoBox}>
             <IconSymbol name="info.circle.fill" size={20} color={colors.primary} />
             <Text style={styles.infoBoxText}>
-              Each purchase increases your mining power, allowing you to mine more MXI per minute during your active rental period.
+              Mining power increases by 1% for every 10 USDT spent. All purchases are valid for 30 days from purchase date.
             </Text>
           </View>
 
@@ -259,7 +262,7 @@ export default function MiningPanelScreen() {
             onPress={() => router.push('/purchase')}
           >
             <IconSymbol name="plus.circle.fill" size={20} color={colors.background} />
-            <Text style={styles.buyButtonText}>Purchase MXI</Text>
+            <Text style={styles.buyButtonText}>Purchase Mining Power (USDT)</Text>
           </Pressable>
         </View>
 
@@ -307,7 +310,7 @@ export default function MiningPanelScreen() {
               <View style={styles.metricItem}>
                 <Text style={styles.metricLabel}>Mining Power</Text>
                 <Text style={styles.metricValue}>
-                  {user?.miningPower.toFixed(2)}x
+                  {user?.miningPower.toFixed(4)}x
                 </Text>
               </View>
             </View>
