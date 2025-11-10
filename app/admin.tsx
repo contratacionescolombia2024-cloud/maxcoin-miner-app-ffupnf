@@ -16,6 +16,8 @@ import { useMiningConfig } from '@/contexts/MiningConfigContext';
 import { useLottery } from '@/contexts/LotteryContext';
 import { useAuth } from '@/contexts/AuthContext';
 
+const ADMIN_EMAIL = 'contratacionescolombia2024@gmail.com';
+
 export default function AdminScreen() {
   const { config, updateConfig, resetConfig } = useMiningConfig();
   const { config: lotteryConfig, updateConfig: updateLotteryConfig } = useLottery();
@@ -41,7 +43,15 @@ export default function AdminScreen() {
 
   const ADMIN_PASSWORD = 'admin123'; // In production, this should be securely stored
 
+  // Check if user is admin
+  const isAdmin = user?.email === ADMIN_EMAIL;
+
   const handleAuthenticate = () => {
+    if (!isAdmin) {
+      Alert.alert('Access Denied', 'Only administrators can access this panel.');
+      return;
+    }
+
     if (adminPassword === ADMIN_PASSWORD) {
       setIsAuthenticated(true);
       Alert.alert('Success', 'Admin access granted');
@@ -129,6 +139,26 @@ export default function AdminScreen() {
     );
   };
 
+  if (!isAdmin) {
+    return (
+      <View style={styles.container}>
+        <ScrollView contentContainerStyle={styles.authContent}>
+          <View style={styles.authHeader}>
+            <IconSymbol name="exclamationmark.triangle.fill" size={80} color={colors.error} />
+            <Text style={styles.title}>Access Denied</Text>
+            <Text style={styles.subtitle}>
+              Only administrators can access this panel.
+            </Text>
+          </View>
+
+          <Pressable style={styles.secondaryButton} onPress={() => router.back()}>
+            <Text style={[styles.buttonText, { color: colors.text }]}>Go Back</Text>
+          </Pressable>
+        </ScrollView>
+      </View>
+    );
+  }
+
   if (!isAuthenticated) {
     return (
       <View style={styles.container}>
@@ -183,7 +213,7 @@ export default function AdminScreen() {
         <View style={styles.header}>
           <IconSymbol name="gearshape.fill" size={60} color={colors.primary} />
           <Text style={styles.title}>Admin Panel</Text>
-          <Text style={styles.subtitle}>Configure mining parameters and manage users</Text>
+          <Text style={styles.subtitle}>Configure mining parameters and lottery settings</Text>
         </View>
 
         {/* Quick Access Card */}

@@ -142,7 +142,29 @@ export default function MXILuckyScreen() {
     return Math.min((totalTickets / config.minTicketsForDraw) * 100, 100);
   };
 
+  const getWinningProbability = () => {
+    if (totalTickets === 0 || userTickets.length === 0) return 0;
+    return (userTickets.length / totalTickets) * 100;
+  };
+
+  const getPrizeDistribution = () => {
+    // Prize distribution among 4 winners based on total participants
+    const firstPrize = prizePool * 0.50; // 50% to 1st place
+    const secondPrize = prizePool * 0.30; // 30% to 2nd place
+    const thirdPrize = prizePool * 0.15; // 15% to 3rd place
+    const fourthPrize = prizePool * 0.05; // 5% to 4th place
+
+    return [
+      { position: '1st Place', amount: firstPrize },
+      { position: '2nd Place', amount: secondPrize },
+      { position: '3rd Place', amount: thirdPrize },
+      { position: '4th Place', amount: fourthPrize },
+    ];
+  };
+
   const quickQuantities = [1, 5, 10, 25];
+  const prizeDistribution = getPrizeDistribution();
+  const winningProbability = getWinningProbability();
 
   return (
     <View style={styles.container}>
@@ -173,11 +195,54 @@ export default function MXILuckyScreen() {
               <Text style={styles.prizeInfoValue}>{config.numberOfWinners}</Text>
             </View>
             <View style={styles.prizeInfoItem}>
-              <Text style={styles.prizeInfoLabel}>Prize %</Text>
-              <Text style={styles.prizeInfoValue}>{config.prizePoolPercentage}%</Text>
+              <Text style={styles.prizeInfoLabel}>Total Tickets</Text>
+              <Text style={styles.prizeInfoValue}>{totalTickets}</Text>
             </View>
           </View>
         </View>
+
+        {/* Prize Distribution Card */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <IconSymbol name="chart.pie.fill" size={28} color="#FFD700" />
+            <Text style={styles.cardTitle}>Prize Distribution</Text>
+          </View>
+          
+          {prizeDistribution.map((prize, index) => (
+            <View key={index} style={styles.prizeDistributionRow}>
+              <View style={styles.prizePosition}>
+                <Text style={styles.prizePositionText}>{prize.position}</Text>
+              </View>
+              <View style={styles.prizeAmountContainer}>
+                <Text style={styles.prizeDistributionAmount}>
+                  {prize.amount.toFixed(2)} MXI
+                </Text>
+                <Text style={styles.prizeDistributionUsd}>
+                  ≈ ${(prize.amount * mxiPrice).toFixed(2)}
+                </Text>
+              </View>
+            </View>
+          ))}
+        </View>
+
+        {/* Your Winning Probability */}
+        {userTickets.length > 0 && (
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <IconSymbol name="percent" size={28} color={colors.success} />
+              <Text style={styles.cardTitle}>Your Winning Probability</Text>
+            </View>
+            
+            <View style={styles.probabilityContainer}>
+              <Text style={styles.probabilityValue}>
+                {winningProbability.toFixed(2)}%
+              </Text>
+              <Text style={styles.probabilityText}>
+                Based on {userTickets.length} ticket{userTickets.length !== 1 ? 's' : ''} out of {totalTickets} total
+              </Text>
+            </View>
+          </View>
+        )}
 
         {/* Draw Progress Card */}
         <View style={styles.card}>
@@ -312,13 +377,13 @@ export default function MXILuckyScreen() {
             • Minimum {config.minTicketsForDraw} tickets must be sold for draw to occur
           </Text>
           <Text style={styles.infoText}>
-            • {config.prizePoolPercentage}% of ticket sales go to prize pool
-          </Text>
-          <Text style={styles.infoText}>
             • {config.numberOfWinners} winners share the prize pool
           </Text>
           <Text style={styles.infoText}>
-            • Winners are selected randomly by administrator
+            • Prize distribution: 50% (1st), 30% (2nd), 15% (3rd), 5% (4th)
+          </Text>
+          <Text style={styles.infoText}>
+            • Your winning probability increases with more tickets
           </Text>
           <Text style={styles.infoText}>
             • Results are published at draw time
@@ -433,6 +498,53 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.text,
     marginLeft: 12,
+  },
+  prizeDistributionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: colors.background,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+  },
+  prizePosition: {
+    flex: 1,
+  },
+  prizePositionText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  prizeAmountContainer: {
+    alignItems: 'flex-end',
+  },
+  prizeDistributionAmount: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#FFD700',
+  },
+  prizeDistributionUsd: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  probabilityContainer: {
+    alignItems: 'center',
+    backgroundColor: colors.background,
+    borderRadius: 12,
+    padding: 24,
+  },
+  probabilityValue: {
+    fontSize: 48,
+    fontWeight: '800',
+    color: colors.success,
+    marginBottom: 8,
+  },
+  probabilityText: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    textAlign: 'center',
   },
   drawDate: {
     fontSize: 14,

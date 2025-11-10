@@ -50,6 +50,7 @@ export interface User {
   transactions: Transaction[];
   withdrawalRestrictions: WithdrawalRestrictions;
   isBlocked?: boolean;
+  hasMiningAccess?: boolean;
 }
 
 interface AuthContextType {
@@ -68,6 +69,8 @@ interface AuthContextType {
   getUserByReferralCode: (code: string) => Promise<User | null>;
   getTransactionHistory: () => Transaction[];
   canWithdrawAmount: (amount: number) => { canWithdraw: boolean; availableForWithdrawal: number; message?: string };
+  getReferralLink: () => string;
+  getActiveReferralsCount: () => Promise<number>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -135,6 +138,37 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const getReferralLink = (): string => {
+    if (!user) return '';
+    // Generate unique referral link for the user
+    return `https://maxcoin-mxi.app/register?ref=${user.referralCode}`;
+  };
+
+  const getActiveReferralsCount = async (): Promise<number> => {
+    if (!user) return 0;
+
+    try {
+      const usersData = await AsyncStorage.getItem(STORAGE_KEYS.USERS);
+      if (!usersData) return 0;
+
+      const users: User[] = JSON.parse(usersData);
+      
+      // Count referrals who have made purchases (initial package or mining power)
+      let activeCount = 0;
+      for (const refId of user.referrals) {
+        const referral = users.find(u => u.id === refId);
+        if (referral && (referral.totalPurchases > 0 || referral.hasMiningAccess)) {
+          activeCount++;
+        }
+      }
+
+      return activeCount;
+    } catch (error) {
+      console.error('Error getting active referrals count:', error);
+      return 0;
+    }
+  };
+
   const register = async (
     username: string,
     email: string,
@@ -187,6 +221,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           canWithdrawEarnings: false,
         },
         isBlocked: false,
+        hasMiningAccess: false,
       };
 
       if (referredByUserId) {
@@ -206,7 +241,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       await AsyncStorage.setItem(STORAGE_KEYS.CURRENT_USER, newUser.id);
 
       setUser(newUser);
-      console.log('User registered:', { username, email, emailVerified: true });
+      console.log('User registered:', { username, email, emailVerified: true, referralLink: `https://maxcoin-mxi.app/register?ref=${newUser.referralCode}` });
       return { success: true };
     } catch (error) {
       console.error('Error registering user:', error);
@@ -312,68 +347,37 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     const restrictions = user.withdrawalRestrictions;
+    
+    // Purchased/transferred MXI is always available for withdrawal
     const availablePurchased = restrictions.purchasedAmount;
     
-    // Check if user can withdraw earnings
-    const canWithdrawEarnings = checkEarningsWithdrawalEligibility(user);
-    const availableEarnings = canWithdrawEarnings ? 
-      (restrictions.miningEarnings + restrictions.commissionEarnings) : 0;
+    // Commission earnings are available immediately
+    const availableCommission = restrictions.commissionEarnings;
     
-    const totalAvailable = availablePurchased + availableEarnings;
+    // Mining earnings require 10 active referrals with purchases
+    const canWithdrawMining = checkMiningWithdrawalEligibility(user);
+    const availableMining = canWithdrawMining ? restrictions.miningEarnings : 0;
+    
+    const totalAvailable = availablePurchased + availableCommission + availableMining;
 
     if (amount > totalAvailable) {
       return {
         canWithdraw: false,
         availableForWithdrawal: totalAvailable,
-        message: `You can only withdraw ${totalAvailable.toFixed(6)} MXI. ` +
-                 `(${availablePurchased.toFixed(6)} from purchases, ` +
-                 `${availableEarnings.toFixed(6)} from earnings)`
+        message: `You can withdraw ${totalAvailable.toFixed(6)} MXI. ` +
+                 `(${availablePurchased.toFixed(6)} purchased, ` +
+                 `${availableCommission.toFixed(6)} commissions, ` +
+                 `${availableMining.toFixed(6)} mining)`
       };
     }
 
     return { canWithdraw: true, availableForWithdrawal: totalAvailable };
   };
 
-  const checkEarningsWithdrawalEligibility = (user: User): boolean => {
-    const restrictions = user.withdrawalRestrictions;
-    
-    // Get active referrals (those who have made purchases or transfers)
-    const activeReferrals = user.referrals.filter(refId => {
-      // This would need to check actual referral data
-      return true; // Simplified for now
-    });
-
-    // First withdrawal requirements: 5 active referrals + 10 days
-    if (restrictions.withdrawalCount === 0) {
-      if (activeReferrals.length < 5) {
-        return false;
-      }
-      
-      if (restrictions.earningsWithdrawalCycleStart) {
-        const cycleStart = new Date(restrictions.earningsWithdrawalCycleStart);
-        const daysSinceCycleStart = (Date.now() - cycleStart.getTime()) / (1000 * 60 * 60 * 24);
-        if (daysSinceCycleStart < 10) {
-          return false;
-        }
-      }
-    }
-    
-    // After second withdrawal: at least 1 active referral per cycle
-    if (restrictions.withdrawalCount >= 2) {
-      if (activeReferrals.length < 1) {
-        return false;
-      }
-      
-      if (restrictions.lastWithdrawalDate) {
-        const lastWithdrawal = new Date(restrictions.lastWithdrawalDate);
-        const daysSinceLastWithdrawal = (Date.now() - lastWithdrawal.getTime()) / (1000 * 60 * 60 * 24);
-        if (daysSinceLastWithdrawal < 10) {
-          return false;
-        }
-      }
-    }
-
-    return true;
+  const checkMiningWithdrawalEligibility = (user: User): boolean => {
+    // Mining withdrawals require 10 active referrals with purchases per cycle
+    // This is checked in real-time via getActiveReferralsCount
+    return user.withdrawalRestrictions.canWithdrawEarnings;
   };
 
   const withdrawMXI = async (
@@ -415,25 +419,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       let remainingAmount = amount;
       const restrictions = users[userIndex].withdrawalRestrictions;
 
-      // First deduct from purchased amount
+      // First deduct from purchased amount (always available)
       if (restrictions.purchasedAmount > 0) {
         const deductFromPurchased = Math.min(remainingAmount, restrictions.purchasedAmount);
         restrictions.purchasedAmount -= deductFromPurchased;
         remainingAmount -= deductFromPurchased;
       }
 
-      // Then deduct from earnings if eligible
-      if (remainingAmount > 0 && checkEarningsWithdrawalEligibility(users[userIndex])) {
+      // Then deduct from commission earnings (always available)
+      if (remainingAmount > 0 && restrictions.commissionEarnings > 0) {
+        const deductFromCommission = Math.min(remainingAmount, restrictions.commissionEarnings);
+        restrictions.commissionEarnings -= deductFromCommission;
+        remainingAmount -= deductFromCommission;
+      }
+
+      // Finally deduct from mining earnings (if eligible)
+      if (remainingAmount > 0 && checkMiningWithdrawalEligibility(users[userIndex])) {
         if (restrictions.miningEarnings > 0) {
           const deductFromMining = Math.min(remainingAmount, restrictions.miningEarnings);
           restrictions.miningEarnings -= deductFromMining;
           remainingAmount -= deductFromMining;
-        }
-        
-        if (remainingAmount > 0 && restrictions.commissionEarnings > 0) {
-          const deductFromCommission = Math.min(remainingAmount, restrictions.commissionEarnings);
-          restrictions.commissionEarnings -= deductFromCommission;
-          remainingAmount -= deductFromCommission;
         }
       }
 
@@ -562,7 +567,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const recipientIndex = users.findIndex(u => u.id === recipient.id);
       users[recipientIndex].balance += recipientReceives;
       
-      // Track as purchased amount for recipient (can be withdrawn)
+      // Track as purchased amount for recipient (can be withdrawn immediately)
       users[recipientIndex].withdrawalRestrictions.purchasedAmount += recipientReceives;
 
       const transactionId = `TXN-${Date.now()}-${Math.random().toString(36).substring(2, 9).toUpperCase()}`;
@@ -601,7 +606,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       users[senderIndex].transactions.unshift(senderTransaction);
       users[recipientIndex].transactions.unshift(recipientTransaction);
 
-      // Distribute commissions
+      // Distribute commissions (available immediately for withdrawal)
       if (users[senderIndex].referredBy) {
         const level1Index = users.findIndex(u => u.id === users[senderIndex].referredBy);
         if (level1Index !== -1) {
@@ -712,7 +717,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         users[userIndex].balance += amount;
         users[userIndex].totalPurchases += amount;
         
-        // Track as purchased amount (can be withdrawn)
+        // Track as purchased amount (can be withdrawn immediately)
         users[userIndex].withdrawalRestrictions.purchasedAmount += amount;
         
         const powerIncrease = (users[userIndex].totalPurchases / config.powerIncreaseThreshold) * (config.powerIncreasePercent / 100);
@@ -730,7 +735,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (!users[userIndex].transactions) users[userIndex].transactions = [];
         users[userIndex].transactions.unshift(purchaseTransaction);
 
-        // Distribute referral commissions
+        // Distribute referral commissions (available immediately for withdrawal)
         if (users[userIndex].referredBy) {
           const level1Index = users.findIndex(u => u.id === users[userIndex].referredBy);
           if (level1Index !== -1) {
@@ -853,6 +858,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         getUserByReferralCode,
         getTransactionHistory,
         canWithdrawAmount,
+        getReferralLink,
+        getActiveReferralsCount,
       }}
     >
       {children}

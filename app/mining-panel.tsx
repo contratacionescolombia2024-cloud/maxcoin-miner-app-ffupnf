@@ -7,6 +7,7 @@ import {
   ScrollView,
   Pressable,
   Alert,
+  Share,
 } from 'react-native';
 import { router } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
@@ -16,12 +17,13 @@ import { colors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 
 export default function MiningPanelScreen() {
-  const { user } = useAuth();
+  const { user, getReferralLink, getActiveReferralsCount } = useAuth();
   const { getMiningAccess, checkAccessExpiry, getMiningAccessCost } = useMiningAccess();
   const { mxiPrice } = useBinance();
   const [miningAccess, setMiningAccess] = useState<any>(null);
   const [hasActiveAccess, setHasActiveAccess] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [activeReferrals, setActiveReferrals] = useState(0);
 
   useEffect(() => {
     loadMiningAccess();
@@ -34,9 +36,11 @@ export default function MiningPanelScreen() {
       setLoading(true);
       const access = await getMiningAccess(user.id);
       const isActive = await checkAccessExpiry(user.id);
+      const activeCount = await getActiveReferralsCount();
       
       setMiningAccess(access);
       setHasActiveAccess(isActive);
+      setActiveReferrals(activeCount);
     } catch (error) {
       console.error('Error loading mining access:', error);
     } finally {
@@ -52,6 +56,19 @@ export default function MiningPanelScreen() {
     router.push('/mining-access-purchase?renewal=true');
   };
 
+  const handleShareReferralLink = async () => {
+    if (!user) return;
+    
+    try {
+      const referralLink = getReferralLink();
+      await Share.share({
+        message: `Join Maxcoin MXI and start mining cryptocurrency! Use my referral link: ${referralLink}`,
+      });
+    } catch (error) {
+      console.error('Error sharing referral link:', error);
+    }
+  };
+
   const getDaysRemaining = () => {
     if (!miningAccess?.expiryDate) return 0;
     const expiry = new Date(miningAccess.expiryDate);
@@ -63,21 +80,15 @@ export default function MiningPanelScreen() {
   const getReferralMetrics = () => {
     if (!user) return { total: 0, active: 0 };
     
-    // Count referrals with purchases
-    const activeReferrals = user.referrals.filter(refId => {
-      // This would check if referral has made purchases
-      return true; // Simplified
-    });
-
     return {
       total: user.referrals.length,
-      active: activeReferrals.length,
+      active: activeReferrals,
     };
   };
 
-  const canWithdrawEarnings = () => {
-    if (!user) return false;
-    return user.withdrawalRestrictions.canWithdrawEarnings;
+  const canWithdrawMiningEarnings = () => {
+    // Mining earnings require 10 active referrals with purchases per cycle
+    return activeReferrals >= 10;
   };
 
   if (loading) {
@@ -100,6 +111,7 @@ export default function MiningPanelScreen() {
   const referralMetrics = getReferralMetrics();
   const daysRemaining = getDaysRemaining();
   const accessCost = getMiningAccessCost();
+  const miningWithdrawalsEnabled = canWithdrawMiningEarnings();
 
   return (
     <View style={styles.container}>
@@ -144,7 +156,7 @@ export default function MiningPanelScreen() {
           ) : (
             <>
               <Text style={styles.noAccessText}>
-                You need to purchase mining access to start earning MXI through mining.
+                You need to purchase the initial mining package (50 USDT) to start earning MXI through mining.
               </Text>
               <View style={styles.costInfo}>
                 <Text style={styles.costLabel}>Access Cost:</Text>
@@ -157,7 +169,7 @@ export default function MiningPanelScreen() {
               
               <Pressable style={styles.purchaseButton} onPress={handlePurchaseAccess}>
                 <IconSymbol name="cart.fill" size={20} color={colors.background} />
-                <Text style={styles.purchaseButtonText}>Purchase Access</Text>
+                <Text style={styles.purchaseButtonText}>Purchase Initial Package</Text>
               </Pressable>
             </>
           )}
@@ -227,7 +239,7 @@ export default function MiningPanelScreen() {
           </View>
           
           <View style={styles.referralRow}>
-            <Text style={styles.referralLabel}>Active Referrals:</Text>
+            <Text style={styles.referralLabel}>Active Referrals (with purchases):</Text>
             <Text style={styles.referralValue}>{referralMetrics.active}</Text>
           </View>
           
@@ -237,37 +249,74 @@ export default function MiningPanelScreen() {
               {(user?.referralEarnings || 0).toFixed(6)} MXI
             </Text>
           </View>
+
+          <View style={styles.progressBarContainer}>
+            <View style={styles.progressBarLabel}>
+              <Text style={styles.progressBarText}>
+                Progress to unlock mining withdrawals
+              </Text>
+              <Text style={styles.progressBarValue}>
+                {referralMetrics.active}/10
+              </Text>
+            </View>
+            <View style={styles.progressBar}>
+              <View 
+                style={[
+                  styles.progressBarFill, 
+                  { width: `${Math.min((referralMetrics.active / 10) * 100, 100)}%` }
+                ]} 
+              />
+            </View>
+          </View>
+
+          <Pressable style={styles.shareButton} onPress={handleShareReferralLink}>
+            <IconSymbol name="square.and.arrow.up" size={20} color={colors.background} />
+            <Text style={styles.shareButtonText}>Share Referral Link</Text>
+          </Pressable>
         </View>
 
         {/* Withdrawal Availability Card */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-            <IconSymbol name="arrow.up.circle.fill" size={32} color={canWithdrawEarnings() ? colors.success : colors.warning} />
+            <IconSymbol name="arrow.up.circle.fill" size={32} color={miningWithdrawalsEnabled ? colors.success : colors.warning} />
             <Text style={styles.cardTitle}>Withdrawal Status</Text>
           </View>
           
           <View style={styles.withdrawalInfo}>
-            <Text style={styles.withdrawalLabel}>Mining/Commission Earnings:</Text>
-            <Text style={[styles.withdrawalStatus, { color: canWithdrawEarnings() ? colors.success : colors.warning }]}>
-              {canWithdrawEarnings() ? 'Available' : 'Restricted'}
-            </Text>
-          </View>
-          
-          {!canWithdrawEarnings() && (
-            <View style={styles.requirementsBox}>
-              <Text style={styles.requirementsTitle}>Requirements to withdraw earnings:</Text>
-              <Text style={styles.requirementText}>• 5 active referrals with purchases</Text>
-              <Text style={styles.requirementText}>• 10 days per withdrawal cycle</Text>
-              <Text style={styles.requirementText}>• After 2nd withdrawal: 1 active referral per cycle</Text>
-            </View>
-          )}
-          
-          <View style={styles.withdrawalInfo}>
-            <Text style={styles.withdrawalLabel}>Purchased MXI:</Text>
+            <Text style={styles.withdrawalLabel}>Purchased/Transferred MXI:</Text>
             <Text style={[styles.withdrawalStatus, { color: colors.success }]}>
               Always Available
             </Text>
           </View>
+          
+          <View style={styles.withdrawalInfo}>
+            <Text style={styles.withdrawalLabel}>Commission Earnings:</Text>
+            <Text style={[styles.withdrawalStatus, { color: colors.success }]}>
+              Available Immediately
+            </Text>
+          </View>
+
+          <View style={styles.withdrawalInfo}>
+            <Text style={styles.withdrawalLabel}>Mining Earnings:</Text>
+            <Text style={[styles.withdrawalStatus, { color: miningWithdrawalsEnabled ? colors.success : colors.warning }]}>
+              {miningWithdrawalsEnabled ? 'Available' : 'Restricted'}
+            </Text>
+          </View>
+          
+          {!miningWithdrawalsEnabled && (
+            <View style={styles.requirementsBox}>
+              <Text style={styles.requirementsTitle}>Requirements to withdraw mining earnings:</Text>
+              <Text style={styles.requirementText}>
+                • 10 active referrals with purchases per cycle
+              </Text>
+              <Text style={styles.requirementText}>
+                • Purchases include initial package (50 USDT) or mining power
+              </Text>
+              <Text style={styles.requirementText}>
+                • Current progress: {referralMetrics.active}/10 active referrals
+              </Text>
+            </View>
+          )}
           
           <Pressable 
             style={styles.withdrawButton} 
@@ -447,6 +496,51 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: colors.text,
+  },
+  progressBarContainer: {
+    marginTop: 16,
+    marginBottom: 16,
+  },
+  progressBarLabel: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  progressBarText: {
+    fontSize: 14,
+    color: colors.textSecondary,
+  },
+  progressBarValue: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.primary,
+  },
+  progressBar: {
+    height: 10,
+    backgroundColor: colors.background,
+    borderRadius: 5,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: colors.primary,
+    borderRadius: 5,
+  },
+  shareButton: {
+    backgroundColor: colors.accent,
+    borderRadius: 12,
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
+  },
+  shareButtonText: {
+    color: colors.background,
+    fontSize: 15,
+    fontWeight: '600',
+    marginLeft: 8,
   },
   withdrawalInfo: {
     flexDirection: 'row',

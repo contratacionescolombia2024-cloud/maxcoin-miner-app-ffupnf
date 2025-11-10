@@ -19,14 +19,18 @@ import { router } from "expo-router";
 import { useLocalization } from "@/contexts/LocalizationContext";
 import { IconSymbol } from "@/components/IconSymbol";
 
+const ADMIN_EMAIL = 'contratacionescolombia2024@gmail.com';
+
 export default function ProfileScreen() {
-  const { user, logout } = useAuth();
+  const { user, logout, getReferralLink } = useAuth();
   const { t } = useLocalization();
   const { config } = useMiningConfig();
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [binanceAddress, setBinanceAddress] = useState("");
+
+  const isAdmin = user?.email === ADMIN_EMAIL;
 
   const handleSaveProfile = () => {
     Alert.alert(
@@ -50,15 +54,16 @@ export default function ProfileScreen() {
     );
   };
 
-  const handleShareReferralCode = async () => {
+  const handleShareReferralLink = async () => {
     if (!user) return;
     
     try {
+      const referralLink = getReferralLink();
       await Share.share({
-        message: t('profile.shareReferralMessage', { code: user.referralCode }),
+        message: `Join Maxcoin MXI and start mining cryptocurrency! Use my referral link: ${referralLink}`,
       });
     } catch (error) {
-      console.error('Error sharing referral code:', error);
+      console.error('Error sharing referral link:', error);
     }
   };
 
@@ -147,9 +152,16 @@ export default function ProfileScreen() {
                 <Text style={styles.referralCodeLabel}>{t('profile.yourReferralCode')}</Text>
                 <Text style={styles.referralCode}>{user.referralCode}</Text>
               </View>
-              <Pressable onPress={handleShareReferralCode} style={styles.shareIconButton}>
+              <Pressable onPress={handleShareReferralLink} style={styles.shareIconButton}>
                 <IconSymbol name="square.and.arrow.up" size={24} color={colors.primary} />
               </Pressable>
+            </View>
+
+            <View style={styles.referralLinkBox}>
+              <Text style={styles.referralLinkLabel}>Your Unique Referral Link:</Text>
+              <Text style={styles.referralLinkText} numberOfLines={1}>
+                {getReferralLink()}
+              </Text>
             </View>
 
             <View style={styles.referralStats}>
@@ -256,14 +268,16 @@ export default function ProfileScreen() {
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>{t('profile.accountActions')}</Text>
             
-            <Pressable 
-              style={styles.actionButton}
-              onPress={() => router.push('/admin')}
-            >
-              <IconSymbol name="gearshape.fill" size={24} color={colors.primary} />
-              <Text style={styles.actionButtonText}>{t('profile.adminPanel')}</Text>
-              <IconSymbol name="chevron.right" size={20} color={colors.textSecondary} />
-            </Pressable>
+            {isAdmin && (
+              <Pressable 
+                style={styles.actionButton}
+                onPress={() => router.push('/admin')}
+              >
+                <IconSymbol name="gearshape.fill" size={24} color={colors.primary} />
+                <Text style={styles.actionButtonText}>{t('profile.adminPanel')}</Text>
+                <IconSymbol name="chevron.right" size={20} color={colors.textSecondary} />
+              </Pressable>
+            )}
 
             <Pressable 
               style={[styles.actionButton, styles.logoutButton]}
@@ -425,6 +439,23 @@ const styles = StyleSheet.create({
     backgroundColor: colors.highlight,
     borderRadius: 12,
     padding: 16,
+  },
+  referralLinkBox: {
+    backgroundColor: colors.highlight,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+  },
+  referralLinkLabel: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    marginBottom: 8,
+  },
+  referralLinkText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.primary,
+    fontFamily: 'monospace',
   },
   referralStats: {
     flexDirection: 'row',
